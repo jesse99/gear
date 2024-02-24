@@ -106,6 +106,7 @@ impl TypeErasedPointer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU8, Ordering};
 
     trait Fruit {
         fn eat(&self) -> String;
@@ -134,6 +135,21 @@ mod tests {
     impl Fruit for Banana {
         fn eat(&self) -> String {
             "mushy".to_owned()
+        }
+    }
+
+    static DROP_COUNT: AtomicU8 = AtomicU8::new(0);
+    struct Football {}
+
+    impl Ball for Football {
+        fn throw(&self) -> String {
+            "touchdown".to_owned()
+        }
+    }
+
+    impl Drop for Football {
+        fn drop(&mut self) {
+            DROP_COUNT.fetch_add(1, Ordering::Relaxed);
         }
     }
 
@@ -175,8 +191,25 @@ mod tests {
         assert!(ball.is_none());
     }
 
-    // TODO: add a test for missing trait
-    // TODO: add a drop impl test
+    #[test]
+    fn dropped_object() {
+        assert_eq!(DROP_COUNT.load(Ordering::Relaxed), 0);
+        {
+            let football = Football {};
+            let mut component = Component::new();
+            component.add_impl1::<dyn Ball, Football>(
+                "Ball".to_owned(),
+                "Football".to_owned(),
+                Box::new(football),
+            );
+
+            let ball = component.find::<dyn Ball>("Ball");
+            assert!(ball.is_some());
+            assert_eq!(ball.unwrap().throw(), "touchdown");
+        }
+        assert_eq!(DROP_COUNT.load(Ordering::Relaxed), 1);
+    }
+
     // TODO: add a macro that generates a get_TraitId function
     //       https://stackoverflow.com/questions/71463576/how-to-use-a-macro-to-generate-compile-time-unique-integers
     //       https://stackoverflow.com/questions/27415011/can-a-rust-macro-create-new-identifiers
