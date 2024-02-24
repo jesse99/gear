@@ -22,18 +22,18 @@ impl Component {
         }
     }
 
-    pub fn add_impl<Trait, Object>(&mut self, trait_id: String, obj_id: String, obj: Box<Object>)
+    pub fn add_impl1<Trait, Object>(&mut self, trait_id: String, obj_id: String, obj: Box<Object>)
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
         Object: Unsize<Trait> + 'static,
     {
-        // TODO: need to check for repeated interfaces
         let typed_ptr = Box::into_raw(obj);
         let erased = TypeErasedPointer::from_trait::<Object, Trait>(typed_ptr);
         self.traits.insert(trait_id, erased);
 
         let erased: Box<dyn Any> = unsafe { Box::from_raw(typed_ptr) };
-        self.objects.insert(obj_id, erased);
+        let old = self.objects.insert(obj_id, erased);
+        assert!(old.is_none(), "trait was already added to the component");
     }
 
     pub fn add_impl2<Trait1, Trait2, Object>(
@@ -48,7 +48,6 @@ impl Component {
         Object: Unsize<Trait1> + 'static,
         Object: Unsize<Trait2> + 'static,
     {
-        // TODO: need to check for repeated interfaces
         let typed_ptr = Box::into_raw(obj);
         let erased = TypeErasedPointer::from_trait::<Object, Trait1>(typed_ptr);
         self.traits.insert(trait1_id, erased);
@@ -57,7 +56,8 @@ impl Component {
         self.traits.insert(trait2_id, erased);
 
         let erased: Box<dyn Any> = unsafe { Box::from_raw(typed_ptr) };
-        self.objects.insert(obj_id, erased);
+        let old = self.objects.insert(obj_id, erased);
+        assert!(old.is_none(), "trait was already added to the component");
     }
 
     // TODO: also need a mutable version
@@ -129,6 +129,14 @@ mod tests {
         }
     }
 
+    struct Banana {}
+
+    impl Fruit for Banana {
+        fn eat(&self) -> String {
+            "mushy".to_owned()
+        }
+    }
+
     #[test]
     fn two_traits() {
         let apple = Apple {};
@@ -149,8 +157,24 @@ mod tests {
         assert_eq!(ball.unwrap().throw(), "splat");
     }
 
-    // TODO: add to github?
-    // TODO: check for repeated traits
+    #[test]
+    fn missing_trait() {
+        let banana = Banana {};
+        let mut component = Component::new();
+        component.add_impl1::<dyn Fruit, Banana>(
+            "Fruit".to_owned(),
+            "Apple".to_owned(),
+            Box::new(banana),
+        );
+
+        let fruit = component.find::<dyn Fruit>("Fruit");
+        assert!(fruit.is_some());
+        assert_eq!(fruit.unwrap().eat(), "mushy");
+
+        let ball = component.find::<dyn Ball>("Ball");
+        assert!(ball.is_none());
+    }
+
     // TODO: add a test for missing trait
     // TODO: add a drop impl test
     // TODO: add a macro that generates a get_TraitId function
@@ -169,4 +193,5 @@ mod tests {
     // TODO: add support for more than two traits per object
     //       can probably use a build script (build.rs) to generate these
     //       https://doc.rust-lang.org/cargo/reference/build-script-examples.html
+    // TODO: work on readme
 }
