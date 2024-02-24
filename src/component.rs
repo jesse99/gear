@@ -24,44 +24,27 @@ impl Component {
         }
     }
 
-    /// Normally the [`add_object1`]` macro would be used instead of calling this directly.
-    pub fn add_impl1<Trait, Object>(&mut self, trait_id: ID, obj_id: ID, obj: Box<Object>)
+    /// Normally the [`add_object`]` macro would be used instead of calling this directly.
+    pub fn add_trait<Trait, Object>(&mut self, trait_id: ID, obj_ptr: *mut Object)
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
         Object: Unsize<Trait> + 'static,
     {
-        let typed_ptr = Box::into_raw(obj);
-        let erased = TypeErasedPointer::from_trait::<Object, Trait>(typed_ptr);
-        self.traits.insert(trait_id, erased);
-
-        let erased: Box<dyn Any> = unsafe { Box::from_raw(typed_ptr) };
-        let old = self.objects.insert(obj_id, erased);
+        let erased = TypeErasedPointer::from_trait::<Object, Trait>(obj_ptr);
+        let old = self.traits.insert(trait_id, erased);
         assert!(old.is_none(), "trait was already added to the component");
     }
 
-    /// Normally the [`add_object2`]` macro would be used instead of calling this directly.
-    pub fn add_impl2<Trait1, Trait2, Object>(
-        &mut self,
-        trait1_id: ID,
-        trait2_id: ID,
-        obj_id: ID,
-        obj: Box<Object>,
-    ) where
-        Trait1: ?Sized + Pointee<Metadata = DynMetadata<Trait1>> + 'static,
-        Trait2: ?Sized + Pointee<Metadata = DynMetadata<Trait2>> + 'static,
-        Object: Unsize<Trait1> + 'static,
-        Object: Unsize<Trait2> + 'static,
+    /// Normally the [`add_object`]` macro would be used instead of calling this directly.
+    pub fn add_object<Object>(&mut self, obj_id: ID, obj_ptr: *mut Object)
+    where
+        Object: 'static,
     {
-        let typed_ptr = Box::into_raw(obj);
-        let erased = TypeErasedPointer::from_trait::<Object, Trait1>(typed_ptr);
-        self.traits.insert(trait1_id, erased);
+        let erased: Box<dyn Any> = unsafe { Box::from_raw(obj_ptr) };
 
-        let erased = TypeErasedPointer::from_trait::<Object, Trait2>(typed_ptr);
-        self.traits.insert(trait2_id, erased);
-
-        let erased: Box<dyn Any> = unsafe { Box::from_raw(typed_ptr) };
-        let old = self.objects.insert(obj_id, erased);
-        assert!(old.is_none(), "trait was already added to the component");
+        // Note that the same object type can be added multiple times. Not clear how useful
+        // this is but it may be when repeated traits are used.
+        self.objects.insert(obj_id, erased);
     }
 
     /// Normally the [`find_trait`]` macro would be used instead of calling this directly.
@@ -117,6 +100,23 @@ macro_rules! register_type {
     };
 }
 
+/// Use the [`add_object`] macro not this one.
+#[macro_export]
+macro_rules! add_traits {
+    ($component:expr, $obj_type:ty, $obj_ptr:expr, $trait1:ty) => {{
+        paste! {
+            $component.add_trait::<dyn $trait1, $obj_type>(
+                [<get_ $trait1:lower _id>](),
+                $obj_ptr);
+        }
+    }};
+
+    ($component:expr, $obj_type:ty, $obj_ptr:expr, $trait1:ty, $($trait2:ty),+) => {{
+        add_traits!($component:expr, $obj_type, $obj_ptr, $trait1)
+        add_traits!($component:expr, $obj_type, $obj_ptr, $($trait2:ty),+)
+    }};
+}
+
 /// Use this to add an object along with its associated traits to a component.
 ///
 /// # Examples
@@ -143,31 +143,30 @@ macro_rules! register_type {
 ///
 /// let apple = Apple {};
 /// let mut component = Component::new();
-/// add_object1!(component, Fruit, Apple, apple);
+/// add_object!(component, Apple, apple, [Fruit]);
 /// ```
 #[macro_export]
-macro_rules! add_object1 {
-    ($component:expr, $trait1:ty, $obj_type:ty, $object:expr) => {{
+macro_rules! add_object {
+    ($component:expr, $obj_type:ty, $object:expr, [$trait1:ty]) => {{
         paste! {
-                $component.add_impl1::<dyn $trait1, $obj_type>(
-                    [<get_ $trait1:lower _id>](),
-                    [<get_ $obj_type:lower _id>](),
-                Box::new($object),
-            );
+            let boxed = Box::new($object);
+            let obj_ptr = Box::into_raw(boxed);
+            add_traits!($component, $obj_type, obj_ptr, $trait1);
+            $component.add_object::<$obj_type>(
+                [<get_ $obj_type:lower _id>](),
+                obj_ptr);
         }
     }};
-}
 
-#[macro_export]
-macro_rules! add_object2 {
-    ($component:expr, $trait1:ty, $trait2:ty, $obj_type:ty, $object:expr) => {{
+    ($component:expr, $obj_type:ty, $object:expr, [$trait1:ty, $($trait2:ty),+]) => {{
         paste! {
-                $component.add_impl2::<dyn $trait1, dyn $trait2, $obj_type>(
-                    [<get_ $trait1:lower _id>](),
-                    [<get_ $trait2:lower _id>](),
-                    [<get_ $obj_type:lower _id>](),
-                Box::new($object),
-            );
+            let boxed = Box::new($object);
+            let obj_ptr = Box::into_raw(boxed);
+            add_traits!($component, $obj_type, obj_ptr, $trait1);
+            add_traits!($component, $obj_type, obj_ptr, $($trait2),+);
+            $component.add_object::<$obj_type>(
+                [<get_ $obj_type:lower _id>](),
+                obj_ptr);
         }
     }};
 }
@@ -198,7 +197,7 @@ macro_rules! add_object2 {
 ///
 /// let apple = Apple {};
 /// let mut component = Component::new();
-/// add_object1!(component, Fruit, Apple, apple);
+/// add_object!(component, Apple, apple, [Fruit]);
 ///
 /// let fruit = find_trait!(component, Fruit);
 /// assert_eq!(fruit.unwrap().eat(), "yum!");
@@ -338,7 +337,7 @@ mod tests {
     fn two_traits() {
         let apple = Apple {};
         let mut component = Component::new();
-        add_object2!(component, Fruit, Ball, Apple, apple);
+        add_object!(component, Apple, apple, [Fruit, Ball]);
 
         let fruit = find_trait!(component, Fruit);
         assert!(fruit.is_some());
@@ -353,7 +352,7 @@ mod tests {
     fn missing_trait() {
         let banana = Banana { ripeness: 0 };
         let mut component = Component::new();
-        add_object1!(component, Fruit, Banana, banana);
+        add_object!(component, Banana, banana, [Fruit]);
 
         let fruit = find_trait!(component, Fruit);
         assert!(fruit.is_some());
@@ -369,7 +368,7 @@ mod tests {
         {
             let football = Football {};
             let mut component = Component::new();
-            add_object1!(component, Ball, Football, football);
+            add_object!(component, Football, football, [Ball]);
 
             let ball = find_trait!(component, Ball);
             assert!(ball.is_some());
@@ -382,7 +381,7 @@ mod tests {
     fn mutable_find() {
         let banana = Banana { ripeness: 0 };
         let mut component = Component::new();
-        add_object2!(component, Fruit, Ripe, Banana, banana);
+        add_object!(component, Banana, banana, [Fruit, Ripe]);
 
         let ripe = find_trait!(component, Ripe).unwrap();
         assert_eq!(ripe.ripeness(), 0);
@@ -398,10 +397,8 @@ mod tests {
     // TODO: add support for repeated traits?
     // TODO: support removing objects?
     // TODO: add an example project
-    // TODO: add support for more than two traits per object
-    //       can probably use a build script (build.rs) to generate these
-    //       https://doc.rust-lang.org/cargo/reference/build-script-examples.html
-    // review old gear project
+    // TODO: fix clippy warnings
+    // TODO: review old gear project
     // TODO: would be nice to retain stringified trait and object names
     //       could then have a Debug impl that printed that
     //       does make Components heavier weight, maybe only do this for debug builds?
