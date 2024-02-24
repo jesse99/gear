@@ -1,7 +1,7 @@
-use super::id::ID;
+use super::{unique_id, ID};
+use fnv::FnvHashMap;
 use paste::paste;
 use std::any::Any;
-use std::collections::HashMap;
 use std::marker::Unsize;
 use std::mem::transmute;
 use std::ptr::{self, DynMetadata, Pointee};
@@ -12,19 +12,19 @@ use std::ptr::{self, DynMetadata, Pointee};
 /// Note that publicly released traits should be treated as immutable to foster backward
 /// compatibility.
 pub struct Component {
-    objects: HashMap<ID, Box<dyn Any>>, // object id => type erased boxed object
-    traits: HashMap<ID, TypeErasedPointer>, // trait id => type erased trait pointer
+    objects: FnvHashMap<ID, Box<dyn Any>>, // object id => type erased boxed object
+    traits: FnvHashMap<ID, TypeErasedPointer>, // trait id => type erased trait pointer
 }
 
 impl Component {
     pub fn new() -> Component {
         Component {
-            objects: HashMap::new(),
-            traits: HashMap::new(),
+            objects: FnvHashMap::default(),
+            traits: FnvHashMap::default(),
         }
     }
 
-    /// Normally the add_object1 macro would be used instead of calling this directly.
+    /// Normally the [`add_object1`]` macro would be used instead of calling this directly.
     pub fn add_impl1<Trait, Object>(&mut self, trait_id: ID, obj_id: ID, obj: Box<Object>)
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
@@ -39,7 +39,7 @@ impl Component {
         assert!(old.is_none(), "trait was already added to the component");
     }
 
-    /// Normally the add_object2 macro would be used instead of calling this directly.
+    /// Normally the [`add_object2`]` macro would be used instead of calling this directly.
     pub fn add_impl2<Trait1, Trait2, Object>(
         &mut self,
         trait1_id: ID,
@@ -64,7 +64,7 @@ impl Component {
         assert!(old.is_none(), "trait was already added to the component");
     }
 
-    /// Normally the find_trait macro would be used instead of calling this directly.
+    /// Normally the [`find_trait`]` macro would be used instead of calling this directly.
     pub fn find<Trait>(&self, trait_id: ID) -> Option<&Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
@@ -83,6 +83,11 @@ impl Component {
 /// # Examples
 ///
 /// ```
+/// #![feature(lazy_cell)]
+/// use gear::*;
+/// use core::sync::atomic::Ordering;
+/// use paste::paste;
+///
 /// trait Fruit {
 ///     fn eat(&self) -> String;
 /// }
@@ -92,8 +97,8 @@ impl Component {
 macro_rules! register_type {
     ($type:ty) => {
         paste! {
-            pub fn [<get_ $type:lower _id>]() -> crate::id::ID {
-                crate::id::unique_id!()
+            pub fn [<get_ $type:lower _id>]() -> ID {
+                unique_id!()
             }
         }
     };
@@ -104,6 +109,25 @@ macro_rules! register_type {
 /// # Examples
 ///
 /// ```
+/// #![feature(lazy_cell)]
+/// use gear::*;
+/// use core::sync::atomic::Ordering;
+/// use paste::paste;
+///
+/// struct Apple {}
+/// register_type!(Apple);
+///
+/// trait Fruit {
+///     fn eat(&self) -> String;
+/// }
+/// register_type!(Fruit);
+///
+/// impl Fruit for Apple {
+///     fn eat(&self) -> String {
+///         "yum!".to_owned()
+///     }
+/// }
+///
 /// let apple = Apple {};
 /// let mut component = Component::new();
 /// add_object1!(component, Fruit, Apple, apple);
@@ -135,6 +159,37 @@ macro_rules! add_object2 {
     }};
 }
 
+/// Returns an optional reference to a trait for an object within the component.
+///
+/// # Examples
+///
+/// ```
+/// #![feature(lazy_cell)]
+/// use gear::*;
+/// use core::sync::atomic::Ordering;
+/// use paste::paste;
+///
+/// struct Apple {}
+/// register_type!(Apple);
+///
+/// trait Fruit {
+///     fn eat(&self) -> String;
+/// }
+/// register_type!(Fruit);
+///
+/// impl Fruit for Apple {
+///     fn eat(&self) -> String {
+///         "yum!".to_owned()
+///     }
+/// }
+///
+/// let apple = Apple {};
+/// let mut component = Component::new();
+/// add_object1!(component, Fruit, Apple, apple);
+///
+/// let fruit = find_trait!(component, Fruit);
+/// assert_eq!(fruit.unwrap().eat(), "yum!");
+/// ```
 #[macro_export]
 macro_rules! find_trait {
     ($component:expr, $trait:ty) => {{
@@ -176,6 +231,7 @@ impl TypeErasedPointer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::NEXT_ID;
     use std::sync::atomic::{AtomicU8, Ordering};
 
     trait Fruit {
@@ -213,6 +269,7 @@ mod tests {
     }
 
     static DROP_COUNT: AtomicU8 = AtomicU8::new(0);
+
     struct Football {}
     register_type!(Football);
 
@@ -284,5 +341,7 @@ mod tests {
     // TODO: add support for more than two traits per object
     //       can probably use a build script (build.rs) to generate these
     //       https://doc.rust-lang.org/cargo/reference/build-script-examples.html
+    // review old gear project
+    // TODO: review docs (especially the item linking)
     // TODO: work on readme
 }
