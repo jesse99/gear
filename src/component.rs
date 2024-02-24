@@ -76,6 +76,19 @@ impl Component {
             None
         }
     }
+
+    /// Normally the [`find_trait_mut`]` macro would be used instead of calling this directly.
+    pub fn find_mut<Trait>(&mut self, trait_id: ID) -> Option<&mut Trait>
+    where
+        Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
+    {
+        if let Some(erased) = self.traits.get(&trait_id) {
+            let r = unsafe { erased.to_trait_mut::<Trait>() };
+            Some(r)
+        } else {
+            None
+        }
+    }
 }
 
 /// Use this for all trait and object types used within components.
@@ -199,6 +212,15 @@ macro_rules! find_trait {
     }};
 }
 
+#[macro_export]
+macro_rules! find_trait_mut {
+    ($component:expr, $trait:ty) => {{
+        paste! {
+            $component.find_mut::<dyn $trait>([<get_ $trait:lower _id>]())
+        }
+    }};
+}
+
 // Decomposed trait pointer.
 struct TypeErasedPointer {
     pointer: *mut (),
@@ -225,6 +247,16 @@ impl TypeErasedPointer {
         let metadata = unsafe { *transmute::<_, *const <Trait as Pointee>::Metadata>(src) };
         let typed_ptr = ptr::from_raw_parts_mut::<Trait>(self.pointer, metadata);
         &*typed_ptr
+    }
+
+    unsafe fn to_trait_mut<'a, Trait>(&self) -> &'a mut Trait
+    where
+        Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
+    {
+        let src = self.metadata.as_ref();
+        let metadata = unsafe { *transmute::<_, *const <Trait as Pointee>::Metadata>(src) };
+        let typed_ptr = ptr::from_raw_parts_mut::<Trait>(self.pointer, metadata);
+        &mut *typed_ptr
     }
 }
 
@@ -259,8 +291,25 @@ mod tests {
         }
     }
 
-    struct Banana {}
+    trait Ripe {
+        fn ripeness(&self) -> i32;
+        fn ripen(&mut self);
+    }
+    register_type!(Ripe);
+    struct Banana {
+        ripeness: i32,
+    }
     register_type!(Banana);
+
+    impl Ripe for Banana {
+        fn ripeness(&self) -> i32 {
+            self.ripeness
+        }
+
+        fn ripen(&mut self) {
+            self.ripeness += 1;
+        }
+    }
 
     impl Fruit for Banana {
         fn eat(&self) -> String {
@@ -302,7 +351,7 @@ mod tests {
 
     #[test]
     fn missing_trait() {
-        let banana = Banana {};
+        let banana = Banana { ripeness: 0 };
         let mut component = Component::new();
         add_object1!(component, Fruit, Banana, banana);
 
@@ -329,19 +378,36 @@ mod tests {
         assert_eq!(DROP_COUNT.load(Ordering::Relaxed), 1);
     }
 
-    // TODO: use a faster hash
-    // TODO: would be nice to retain stringified trait and object names
-    //       could then have a Debug impl that printed that
-    //       does make Components heavier weight, maybe only do this for debug builds?
-    //          or can we generate functions to get a string from an id? not sure how we'd call those
-    //       can we use Formatter to optionally delegate to objects?
-    // TODO: need a mutable find
+    #[test]
+    fn mutable_find() {
+        let banana = Banana { ripeness: 0 };
+        let mut component = Component::new();
+        add_object2!(component, Fruit, Ripe, Banana, banana);
+
+        let ripe = find_trait!(component, Ripe).unwrap();
+        assert_eq!(ripe.ripeness(), 0);
+
+        let mripe = find_trait_mut!(component, Ripe).unwrap();
+        mripe.ripen();
+        mripe.ripen();
+
+        let ripe = find_trait!(component, Ripe).unwrap(); // grab a new ref to appease the borrow checker
+        assert_eq!(ripe.ripeness(), 2);
+    }
+
     // TODO: add support for repeated traits?
     // TODO: support removing objects?
+    // TODO: add an example project
     // TODO: add support for more than two traits per object
     //       can probably use a build script (build.rs) to generate these
     //       https://doc.rust-lang.org/cargo/reference/build-script-examples.html
     // review old gear project
+    // TODO: would be nice to retain stringified trait and object names
+    //       could then have a Debug impl that printed that
+    //       does make Components heavier weight, maybe only do this for debug builds?
+    //          or can we generate functions to get a string from an id? not sure how we'd call those
+    //          maybe ID could include a string in debug
+    //       can we use Formatter to optionally delegate to objects?
     // TODO: review docs (especially the item linking)
     // TODO: work on readme
 }
