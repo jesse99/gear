@@ -6,8 +6,8 @@ pub struct World {
     pub width: i32,
     pub height: i32,
     actors: HashMap<Point, Vec<Component>>,
-    ticks: i32, // incremented each time actors get a chance to act
     dummy: Vec<Component>,
+    ticks: i32, // incremented each time actors get a chance to act
 }
 
 impl World {
@@ -16,8 +16,8 @@ impl World {
             width,
             height,
             actors: HashMap::new(),
-            ticks: 0,
             dummy: Vec::new(),
+            ticks: 0,
         }
     }
 
@@ -99,7 +99,10 @@ impl World {
         }
         println!();
     }
+}
 
+// internals
+impl World {
     fn len_at(&mut self, loc: Point) -> usize {
         self.actors.get_mut(&loc).map_or(0, |v| v.len())
     }
