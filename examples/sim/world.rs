@@ -21,6 +21,7 @@ impl World {
         }
     }
 
+    /// Note that it is an error to add a component on top of an existing component.
     pub fn add(&mut self, loc: Point, actor: Component) {
         assert!(loc.x >= 0);
         assert!(loc.y >= 0);
@@ -64,6 +65,7 @@ impl World {
         cells
     }
 
+    /// Allow all components a chance to act.
     pub fn step(&mut self) {
         // This is delicate because we want to mutate actors which may also cause the world
         // to mutate (e.g. they can add new actors to the world).
@@ -96,6 +98,7 @@ impl World {
         self.ticks += 1;
     }
 
+    /// Render all components to the terminal.
     pub fn render(&self) {
         println!("{}  ticks: {}", "-".repeat(self.width as usize), self.ticks);
         for y in 0..self.height {

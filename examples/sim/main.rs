@@ -17,7 +17,6 @@ use traits::*;
 use world::*;
 
 // TODO:
-// move grass into its own file
 // radomize step function
 // randomize grass location, should add patches (can overlap)
 // add rabbits

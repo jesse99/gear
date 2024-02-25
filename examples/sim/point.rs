@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::fmt::{self, Formatter};
 use std::hash::{Hash, Hasher};
 
-/// Represents a point in cartesian space, typically a location within a level.
+/// Represents a point in cartesian space,.
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct Point {
     pub x: i32,
@@ -12,24 +12,6 @@ pub struct Point {
 impl Point {
     pub fn new(x: i32, y: i32) -> Point {
         Point { x, y }
-    }
-
-    /// top-left
-    pub fn origin() -> Point {
-        Point { x: 0, y: 0 }
-    }
-
-    pub fn adjacent(&self, rhs: Point) -> bool {
-        let dx = (self.x - rhs.x).abs();
-        let dy = (self.y - rhs.y).abs();
-        dx <= 1 && dy <= 1 && !(dx == 0 && dy == 0)
-    }
-
-    /// distance squared between two points
-    pub fn distance2(&self, rhs: Point) -> i32 {
-        let dx = self.x - rhs.x;
-        let dy = self.y - rhs.y;
-        dx * dx + dy * dy
     }
 }
 

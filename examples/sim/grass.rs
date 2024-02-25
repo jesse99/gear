@@ -1,3 +1,4 @@
+//! Terran type that grows to cover the world but may also be eaten by rabbits.
 use super::*;
 
 const GRASS_DELTA: u8 = 8;
@@ -8,10 +9,8 @@ pub struct Grass {
 register_type!(Grass);
 
 pub fn add_grass(world: &mut World, loc: Point) {
-    let grass = Grass::new();
-
     let mut actor = Component::new();
-    add_object!(actor, Grass, grass, [Action, Render, Terrain]);
+    add_object!(actor, Grass, Grass::new(), [Action, Render, Terrain]);
     world.add(loc, actor);
 }
 
