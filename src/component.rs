@@ -14,6 +14,8 @@ use std::ptr::{self, DynMetadata, Pointee};
 pub struct Component {
     objects: FnvHashMap<ID, Box<dyn Any>>, // object id => type erased boxed object
     traits: FnvHashMap<ID, TypeErasedPointer>, // trait id => type erased trait pointer
+    repeated: FnvHashMap<ID, Vec<TypeErasedPointer>>, // trait id => [type erased trait pointer]
+    empty: Vec<TypeErasedPointer>,
 }
 
 impl Component {
@@ -21,6 +23,8 @@ impl Component {
         Component {
             objects: FnvHashMap::default(),
             traits: FnvHashMap::default(),
+            repeated: FnvHashMap::default(),
+            empty: Vec::new(),
         }
     }
 
@@ -33,6 +37,17 @@ impl Component {
         let erased = TypeErasedPointer::from_trait::<Object, Trait>(obj_ptr);
         let old = self.traits.insert(trait_id, erased);
         assert!(old.is_none(), "trait was already added to the component");
+    }
+
+    /// Normally the [`add_object`]` macro would be used instead of calling this directly.
+    pub fn add_repeated_trait<Trait, Object>(&mut self, trait_id: ID, obj_ptr: *mut Object)
+    where
+        Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
+        Object: Unsize<Trait> + 'static,
+    {
+        let erased = TypeErasedPointer::from_trait::<Object, Trait>(obj_ptr);
+        let pointers = self.repeated.entry(trait_id).or_insert(vec![]);
+        pointers.push(erased);
     }
 
     /// Normally the [`add_object`]` macro would be used instead of calling this directly.
@@ -71,6 +86,30 @@ impl Component {
         } else {
             None
         }
+    }
+
+    /// Normally the [`find_repeated_trait`]` macro would be used instead of calling this directly.
+    pub fn find_repeated<Trait>(&self, trait_id: ID) -> impl Iterator<Item = &Trait>
+    where
+        Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
+    {
+        self.repeated
+            .get(&trait_id)
+            .unwrap_or(&self.empty)
+            .iter()
+            .map(|e| unsafe { e.to_trait::<Trait>() })
+    }
+
+    /// Normally the [`find_repeated_trait_mut`]` macro would be used instead of calling this directly.
+    pub fn find_repeated_mut<Trait>(&mut self, trait_id: ID) -> impl Iterator<Item = &mut Trait>
+    where
+        Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
+    {
+        self.repeated
+            .get(&trait_id)
+            .unwrap_or(&self.empty)
+            .iter()
+            .map(|e| unsafe { e.to_trait_mut::<Trait>() })
     }
 }
 
@@ -117,7 +156,25 @@ macro_rules! add_traits {
     }};
 }
 
-/// Use this to add an object along with its associated traits to a component.
+/// Use the [`add_object`] macro not this one.
+#[macro_export]
+macro_rules! add_repeated_traits {
+    ($component:expr, $obj_type:ty, $obj_ptr:expr, $trait1:ty) => {{
+        paste! {
+            $component.add_repeated_trait::<dyn $trait1, $obj_type>(
+                [<get_ $trait1:lower _id>](),
+                $obj_ptr);
+        }
+    }};
+
+    ($component:expr, $obj_type:ty, $obj_ptr:expr, $trait1:ty, $($trait2:ty),+) => {{
+        add_repeated_traits!($component:expr, $obj_type, $obj_ptr, $trait1)
+        add_repeated_traits!($component:expr, $obj_type, $obj_ptr, $($trait2:ty),+)
+    }};
+}
+
+/// Use this to add an object along with its associated traits to a component. Note that
+/// repeated traits are listed in a second optional list.
 ///
 /// # Examples
 ///
@@ -126,6 +183,7 @@ macro_rules! add_traits {
 /// use gear::*;
 /// use core::sync::atomic::Ordering;
 /// use paste::paste;
+/// use std::fmt::{self, Display};
 ///
 /// struct Apple {}
 /// register_type!(Apple);
@@ -141,13 +199,20 @@ macro_rules! add_traits {
 ///     }
 /// }
 ///
+/// impl fmt::Display for Apple {
+///     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+///         write!(f, "Apple")
+///     }
+/// }
+/// register_type!(Display);
+///
 /// let apple = Apple {};
 /// let mut component = Component::new();
-/// add_object!(component, Apple, apple, [Fruit]);
+/// add_object!(component, Apple, apple, [Fruit], [Display]);
 /// ```
 #[macro_export]
 macro_rules! add_object {
-    ($component:expr, $obj_type:ty, $object:expr, [$trait1:ty]) => {{
+    ($component:expr, $obj_type:ty, $object:expr, [$trait1:ty]) => {{   // 1 0
         paste! {
             let boxed = Box::new($object);
             let obj_ptr = Box::into_raw(boxed);
@@ -158,12 +223,64 @@ macro_rules! add_object {
         }
     }};
 
-    ($component:expr, $obj_type:ty, $object:expr, [$trait1:ty, $($trait2:ty),+]) => {{
+    ($component:expr, $obj_type:ty, $object:expr, [$trait1:ty], [$trait2:ty]) => {{ // 1 1
+        paste! {
+            let boxed = Box::new($object);
+            let obj_ptr = Box::into_raw(boxed);
+            add_traits!($component, $obj_type, obj_ptr, $trait1);
+            add_repeated_traits!($component, $obj_type, obj_ptr, $trait2);
+            $component.add_object::<$obj_type>(
+                [<get_ $obj_type:lower _id>](),
+                obj_ptr);
+        }
+    }};
+
+    ($component:expr, $obj_type:ty, $object:expr, [$trait1:ty], [$trait2:ty, $($trait3:ty),+]) => {{   // 1 +
+        paste! {
+            let boxed = Box::new($object);
+            let obj_ptr = Box::into_raw(boxed);
+            add_traits!($component, $obj_type, obj_ptr, $trait1);
+            add_repeated_traits!($component, $obj_type, obj_ptr, $trait2);
+            add_repeated_traits!($component, $obj_type, obj_ptr, $($trait3),+);
+            $component.add_object::<$obj_type>(
+                [<get_ $obj_type:lower _id>](),
+                obj_ptr);
+        }
+    }};
+
+    ($component:expr, $obj_type:ty, $object:expr, [$trait1:ty, $($trait2:ty),+]) => {{  // + 0
         paste! {
             let boxed = Box::new($object);
             let obj_ptr = Box::into_raw(boxed);
             add_traits!($component, $obj_type, obj_ptr, $trait1);
             add_traits!($component, $obj_type, obj_ptr, $($trait2),+);
+            $component.add_object::<$obj_type>(
+                [<get_ $obj_type:lower _id>](),
+                obj_ptr);
+        }
+    }};
+
+    ($component:expr, $obj_type:ty, $object:expr, [$trait1:ty, $($trait2:ty),+], [$trait3:ty]) => {{   // + 1
+        paste! {
+            let boxed = Box::new($object);
+            let obj_ptr = Box::into_raw(boxed);
+            add_traits!($component, $obj_type, obj_ptr, $trait1);
+            add_traits!($component, $obj_type, obj_ptr, $($trait2),+);
+            add_repeated_traits!($component, $obj_type, obj_ptr, $trait3);
+            $component.add_object::<$obj_type>(
+                [<get_ $obj_type:lower _id>](),
+                obj_ptr);
+        }
+    }};
+
+    ($component:expr, $obj_type:ty, $object:expr, [$trait1:ty, $($trait2:ty),+], [$trait3:ty, $($trait4:ty),+]) => {{   // + +
+        paste! {
+            let boxed = Box::new($object);
+            let obj_ptr = Box::into_raw(boxed);
+            add_traits!($component, $obj_type, obj_ptr, $trait1);
+            add_traits!($component, $obj_type, obj_ptr, $($trait2),+);
+            add_repeated_traits!($component, $obj_type, obj_ptr, $trait3);
+            add_repeated_traits!($component, $obj_type, obj_ptr, $($trait4),+);
             $component.add_object::<$obj_type>(
                 [<get_ $obj_type:lower _id>](),
                 obj_ptr);
@@ -220,6 +337,26 @@ macro_rules! find_trait_mut {
     }};
 }
 
+/// Returns an iterator over a trait that may be implemented by multiple objects within
+/// the component.
+#[macro_export]
+macro_rules! find_repeated_trait {
+    ($component:expr, $trait:ty) => {{
+        paste! {
+            $component.find_repeated::<dyn $trait>([<get_ $trait:lower _id>]())
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! find_repeated_trait_mut {
+    ($component:expr, $trait:ty) => {{
+        paste! {
+            $component.find_repeated_mut::<dyn $trait>([<get_ $trait:lower _id>]())
+        }
+    }};
+}
+
 // Decomposed trait pointer.
 struct TypeErasedPointer {
     pointer: *mut (),
@@ -263,6 +400,7 @@ impl TypeErasedPointer {
 mod tests {
     use super::*;
     use crate::NEXT_ID;
+    use std::fmt::{self, Display};
     use std::sync::atomic::{AtomicU8, Ordering};
 
     trait Fruit {
@@ -290,6 +428,13 @@ mod tests {
         }
     }
 
+    impl fmt::Display for Apple {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "Apple")
+        }
+    }
+    register_type!(Display);
+
     trait Ripe {
         fn ripeness(&self) -> i32;
         fn ripen(&mut self);
@@ -313,6 +458,12 @@ mod tests {
     impl Fruit for Banana {
         fn eat(&self) -> String {
             "mushy".to_owned()
+        }
+    }
+
+    impl fmt::Display for Banana {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "Banana")
         }
     }
 
@@ -394,9 +545,26 @@ mod tests {
         assert_eq!(ripe.ripeness(), 2);
     }
 
-    // TODO: add support for repeated traits?
+    #[test]
+    fn repeated() {
+        let banana = Banana { ripeness: 0 };
+        let apple = Apple {};
+        let mut component = Component::new();
+        add_object!(component, Banana, banana, [Fruit, Ripe], [Display]);
+        add_object!(component, Apple, apple, [Ball], [Display]);
+
+        let displays: Vec<String> = find_repeated_trait!(component, Display)
+            .map(|t| format!("{t}"))
+            .collect();
+        assert_eq!(displays.len(), 2);
+        assert!(
+            (displays[0] == "Apple" && displays[1] == "Banana")
+                || (displays[1] == "Apple" && displays[0] == "Banana")
+        );
+    }
+
     // TODO: support removing objects?
-    // TODO: add an example project
+    // TODO: add an example project, maybe predator/prey sim? grass grows, rabbits eat grass, wolves eat rabbits
     // TODO: fix clippy warnings
     // TODO: review old gear project
     // TODO: would be nice to retain stringified trait and object names
