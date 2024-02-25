@@ -17,17 +17,18 @@ use traits::*;
 use world::*;
 
 // TODO:
-// radomize step function
+// would be really nice to have a stack of components, eg for skeletons
+// radomize step function, use flex in dependency specs
 // randomize grass location, should add patches (can overlap)
 // add rabbits
 // rabbits should eat grass
-// rabbits should starve (leave a skeleton behind for a bit?)
+// rabbits should starve (leave a skeleton behind for a bit? kind of interferes tho)
 // rabbits should reproduce
 // add wolves
 // wolves should eat rabbits
 // wolves should starve (leave a skeleton behind for a bit?)
 // wolves should reproduce
-// use termion?
+// use termion? or just use command line options to configure?
 // track stats over time?
 // add some sort of readme
 fn main() {
