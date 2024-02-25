@@ -159,8 +159,8 @@ macro_rules! add_traits {
     }};
 
     ($component:expr, $obj_type:ty, $obj_ptr:expr, $trait1:ty, $($trait2:ty),+) => {{
-        add_traits!($component:expr, $obj_type, $obj_ptr, $trait1)
-        add_traits!($component:expr, $obj_type, $obj_ptr, $($trait2:ty),+)
+        add_traits!($component, $obj_type, $obj_ptr, $trait1);
+        add_traits!($component, $obj_type, $obj_ptr, $($trait2),+)
     }};
 }
 
@@ -176,8 +176,8 @@ macro_rules! add_repeated_traits {
     }};
 
     ($component:expr, $obj_type:ty, $obj_ptr:expr, $trait1:ty, $($trait2:ty),+) => {{
-        add_repeated_traits!($component:expr, $obj_type, $obj_ptr, $trait1)
-        add_repeated_traits!($component:expr, $obj_type, $obj_ptr, $($trait2:ty),+)
+        add_repeated_traits!($component, $obj_type, $obj_ptr, $trait1);
+        add_repeated_traits!($component, $obj_type, $obj_ptr, $($trait2),+)
     }};
 }
 
