@@ -5,9 +5,9 @@ use std::collections::HashMap;
 pub struct World {
     pub width: i32,
     pub height: i32,
-    terrain: HashMap<Point, Component>, // grass or potentially stuff like water
-    animals: HashMap<Point, Component>, // sheep or wolf
-    ticks: i32,                         // incremented each time actors get a chance to act
+    actors: HashMap<Point, Vec<Component>>,
+    ticks: i32, // incremented each time actors get a chance to act
+    dummy: Vec<Component>,
 }
 
 impl World {
@@ -15,13 +15,12 @@ impl World {
         World {
             width,
             height,
-            terrain: HashMap::new(),
-            animals: HashMap::new(),
+            actors: HashMap::new(),
             ticks: 0,
+            dummy: Vec::new(),
         }
     }
 
-    /// Note that it is an error to add a component on top of an existing component.
     pub fn add(&mut self, loc: Point, actor: Component) {
         assert!(loc.x >= 0);
         assert!(loc.y >= 0);
@@ -30,16 +29,12 @@ impl World {
         assert!(has_trait!(actor, Action)); // required traits, objects may make use of others
         assert!(has_trait!(actor, Render));
 
-        let old = if has_trait!(actor, Terrain) {
-            self.terrain.insert(loc, actor)
-        } else {
-            self.animals.insert(loc, actor)
-        };
-        assert!(old.is_none());
+        let actors = self.actors.entry(loc).or_default();
+        actors.push(actor);
     }
 
-    pub fn get_terrain(&self, loc: Point) -> Option<&Component> {
-        self.terrain.get(&loc)
+    pub fn get(&self, loc: Point) -> &Vec<Component> {
+        &self.actors.get(&loc).unwrap_or(&self.dummy)
     }
 
     /// Return all cells within radius of loc that satisfy the predicate.
@@ -69,28 +64,17 @@ impl World {
     pub fn step(&mut self) {
         // This is delicate because we want to mutate actors which may also cause the world
         // to mutate (e.g. they can add new actors to the world).
-        let locs: Vec<Point> = self.terrain.keys().copied().collect(); // TODO: randomize these
+        let locs: Vec<Point> = self.actors.keys().copied().collect(); // TODO: randomize these
         for loc in locs {
-            // Earlier actor may have deleted this one.
-            if let Some(mut actor) = self.terrain.remove(&loc) {
+            let len = self.len_at(loc);
+            let mut i = 0;
+            while i < len {
+                let mut actor = self.remove_at(loc, i);
                 let action = find_trait_mut!(actor, Action).unwrap();
                 let alive = action.act(self, loc);
                 if alive {
-                    // This is safe because while an actor may add a new actor to a
-                    // neighboring cell it won't add one to its own cell.
-                    self.add(loc, actor);
-                }
-            }
-        }
-
-        // Difficult to avoid this repetition because of the borrow checker.
-        let locs: Vec<Point> = self.animals.keys().copied().collect(); // TODO: randomize these
-        for loc in locs {
-            if let Some(mut actor) = self.animals.remove(&loc) {
-                let action = find_trait_mut!(actor, Action).unwrap();
-                let alive = action.act(self, loc);
-                if alive {
-                    self.add(loc, actor);
+                    self.insert_at(loc, i, actor);
+                    i += 1;
                 }
             }
         }
@@ -98,26 +82,33 @@ impl World {
         self.ticks += 1;
     }
 
-    /// Render all components to the terminal.
+    /// Render all cells to the terminal.
     pub fn render(&self) {
         println!("{}  ticks: {}", "-".repeat(self.width as usize), self.ticks);
         for y in 0..self.height {
             for x in 0..self.width {
                 let loc = Point::new(x, y);
-                if let Some(actor) = self.animals.get(&loc) {
+                if let Some(actor) = self.actors.get(&loc).map(|v| v.last()).flatten() {
                     let render = find_trait!(actor, Render).unwrap();
                     print!("{}", render.render());
                 } else {
-                    if let Some(actor) = self.terrain.get(&loc) {
-                        let render = find_trait!(actor, Render).unwrap();
-                        print!("{}", render.render());
-                    } else {
-                        print!(" ");
-                    }
+                    print!(" ");
                 }
             }
             println!();
         }
         println!();
+    }
+
+    fn len_at(&mut self, loc: Point) -> usize {
+        self.actors.get_mut(&loc).map_or(0, |v| v.len())
+    }
+
+    fn remove_at(&mut self, loc: Point, i: usize) -> Component {
+        self.actors.get_mut(&loc).unwrap().remove(i)
+    }
+
+    fn insert_at(&mut self, loc: Point, i: usize, actor: Component) {
+        self.actors.get_mut(&loc).unwrap().insert(i, actor);
     }
 }

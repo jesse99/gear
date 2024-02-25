@@ -17,7 +17,6 @@ use traits::*;
 use world::*;
 
 // TODO:
-// would be really nice to have a stack of components, eg for skeletons
 // radomize step function, use flex in dependency specs
 // randomize grass location, should add patches (can overlap)
 // add rabbits

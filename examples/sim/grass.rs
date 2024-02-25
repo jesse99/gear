@@ -31,7 +31,9 @@ impl Action for Grass {
 
         // Once grass has grown enough it starts spreading.
         if self.height > 2 * GRASS_DELTA {
-            for neighbor in world.all(loc, 1, |p| world.get_terrain(p).is_none()) {
+            for neighbor in world.all(loc, 1, |pt| {
+                world.get(pt).iter().all(|a| !has_trait!(a, Terrain))
+            }) {
                 add_grass(world, neighbor);
             }
         }
