@@ -62,6 +62,14 @@ impl Component {
         self.objects.insert(obj_id, erased);
     }
 
+    /// Normally the [`has_trait`]` macro would be used instead of calling this directly.
+    pub fn has<Trait>(&self, trait_id: ID) -> bool
+    where
+        Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
+    {
+        self.traits.get(&trait_id).is_some()
+    }
+
     /// Normally the [`find_trait`]` macro would be used instead of calling this directly.
     pub fn find<Trait>(&self, trait_id: ID) -> Option<&Trait>
     where
@@ -288,6 +296,15 @@ macro_rules! add_object {
     }};
 }
 
+#[macro_export]
+macro_rules! has_trait {
+    ($component:expr, $trait:ty) => {{
+        paste! {
+            $component.has::<dyn $trait>([<get_ $trait:lower _id>]())
+        }
+    }};
+}
+
 /// Returns an optional reference to a trait for an object within the component.
 ///
 /// # Examples
@@ -497,6 +514,16 @@ mod tests {
         let ball = find_trait!(component, Ball);
         assert!(ball.is_some());
         assert_eq!(ball.unwrap().throw(), "splat");
+    }
+
+    #[test]
+    fn has() {
+        let apple = Apple {};
+        let mut component = Component::new();
+        add_object!(component, Apple, apple, [Fruit, Ball]);
+
+        assert!(has_trait!(component, Fruit));
+        assert!(!has_trait!(component, Ripe));
     }
 
     #[test]
