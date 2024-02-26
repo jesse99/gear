@@ -6,6 +6,7 @@ use core::sync::atomic::Ordering;
 use gear::*;
 use paste::paste;
 use rand::rngs::StdRng;
+use rand::Rng;
 use rand::{RngCore, SeedableRng};
 
 mod grass;
@@ -18,9 +19,26 @@ use point::*;
 use traits::*;
 use world::*;
 
+fn add_grass_patch(world: &mut World, center: Point, radius: i32) {
+    for dy in -radius..=radius {
+        let y = center.y + dy;
+        if y >= 0 && y < world.height {
+            for dx in -radius..=radius {
+                let x = center.x + dx;
+                if x >= 0 && x < world.width {
+                    let loc = Point::new(x, y);
+                    if center.distance2(loc) < radius {
+                        if world.get(loc).is_empty() {
+                            add_grass(world, loc);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 // TODO:
-// radomize step function, use flex in dependency specs
-// randomize grass location, should add patches (can overlap)
 // add rabbits, think we want a Fodder trait (possibly get rid of Terrain)
 // rabbits should eat grass (will need to fixup step if grass is all eaten up)
 // rabbits should starve (leave a skeleton behind for a bit? kind of interferes tho)
@@ -31,16 +49,21 @@ use world::*;
 // wolves should reproduce
 // use termion? or just use command line options to configure?
 //    seed, width/height, maybe debug (prints extra state)
+//    grass patch params?
 // track stats over time?
 // add some sort of readme
 fn main() {
     let rng = StdRng::seed_from_u64(1);
     let mut world = World::new(20, 20, Box::new(rng));
 
-    add_grass(&mut world, Point::new(5, 5));
-    add_grass(&mut world, Point::new(6, 5));
-    add_grass(&mut world, Point::new(7, 5));
-    add_grass(&mut world, Point::new(6, 6));
+    for _ in 0..4 {
+        let radius: i32 = world.rng.gen_range(1..10);
+        let center = Point::new(
+            world.rng.gen_range(0..world.width),
+            world.rng.gen_range(0..world.height),
+        );
+        add_grass_patch(&mut world, center, radius);
+    }
 
     for _ in 0..10 {
         world.render();

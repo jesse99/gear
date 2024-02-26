@@ -7,10 +7,10 @@ use std::collections::HashMap;
 pub struct World {
     pub width: i32,
     pub height: i32,
+    pub rng: Box<dyn RngCore>,
     actors: HashMap<Point, Vec<Component>>,
     dummy: Vec<Component>,
     ticks: i32, // incremented each time actors get a chance to act
-    rng: Box<dyn RngCore>,
 }
 
 impl World {
@@ -18,10 +18,10 @@ impl World {
         World {
             width,
             height,
+            rng,
             actors: HashMap::new(),
             dummy: Vec::new(),
             ticks: 0,
-            rng,
         }
     }
 
