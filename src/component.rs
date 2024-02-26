@@ -1,12 +1,14 @@
 #[allow(unused_imports)]
-use super::{unique_type_id, TypeId};
+use super::*;
 use fnv::FnvHashMap;
 #[allow(unused_imports)]
 use paste::paste;
 use std::any::Any;
+use std::hash::{Hash, Hasher};
 use std::marker::Unsize;
 use std::mem::transmute;
 use std::ptr::{self, DynMetadata, Pointee};
+use std::sync::atomic::Ordering;
 
 /// The unit of composition for the gear object model.
 /// A component consists  of one or more objects. Each object implements one or more
@@ -14,6 +16,7 @@ use std::ptr::{self, DynMetadata, Pointee};
 /// Note that publicly released traits should be treated as immutable to foster backward
 /// compatibility.
 pub struct Component {
+    pub id: ComponentId,
     objects: FnvHashMap<TypeId, Box<dyn Any>>, // object id => type erased boxed object
     traits: FnvHashMap<TypeId, TypeErasedPointer>, // trait id => type erased trait pointer
     repeated: FnvHashMap<TypeId, Vec<TypeErasedPointer>>, // trait id => [type erased trait pointer]
@@ -23,6 +26,7 @@ pub struct Component {
 impl Component {
     pub fn new() -> Component {
         Component {
+            id: unique_component_id!(),
             objects: FnvHashMap::default(),
             traits: FnvHashMap::default(),
             repeated: FnvHashMap::default(),
@@ -376,6 +380,32 @@ macro_rules! find_repeated_trait_mut {
     }};
 }
 
+impl PartialEq for Component {
+    fn eq(&self, other: &Component) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for Component {}
+
+impl Ord for Component {
+    fn cmp(&self, rhs: &Self) -> std::cmp::Ordering {
+        self.id.cmp(&rhs.id)
+    }
+}
+
+impl PartialOrd for Component {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Hash for Component {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
 // Decomposed trait pointer.
 struct TypeErasedPointer {
     pointer: *mut (),
@@ -418,9 +448,8 @@ impl TypeErasedPointer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::NEXT_TYPE_ID;
     use std::fmt::{self, Display};
-    use std::sync::atomic::{AtomicU8, Ordering};
+    use std::sync::atomic::AtomicU8;
 
     trait Fruit {
         fn eat(&self) -> String;
