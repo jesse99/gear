@@ -131,7 +131,7 @@ impl World {
 
         while !self.pending.is_empty() {
             let (loc, id) = self.pending.pop().unwrap();
-            let mut actor = self.components.remove(&id).unwrap();
+            let actor = self.components.remove(&id).unwrap();
             let id = actor.id;
 
             self.executing = (loc, id);

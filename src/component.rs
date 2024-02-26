@@ -89,7 +89,7 @@ impl Component {
     }
 
     /// Normally the [`find_trait_mut`]` macro would be used instead of calling this directly.
-    pub fn find_mut<Trait>(&mut self, trait_id: TypeId) -> Option<&mut Trait>
+    pub fn find_mut<Trait>(&self, trait_id: TypeId) -> Option<&mut Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
@@ -114,7 +114,7 @@ impl Component {
     }
 
     /// Normally the [`find_repeated_trait_mut`]` macro would be used instead of calling this directly.
-    pub fn find_repeated_mut<Trait>(&mut self, trait_id: TypeId) -> impl Iterator<Item = &mut Trait>
+    pub fn find_repeated_mut<Trait>(&self, trait_id: TypeId) -> impl Iterator<Item = &mut Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
