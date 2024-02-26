@@ -6,5 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fnv = "1.0.7"    # custom hasher that is much more performant for small keys
-paste = "1.0.14" # allows identifiers to be pasted together within macros
+fnv = "1.0"   # custom hasher that is much more performant for small keys
+paste = "1.0" # allows identifiers to be pasted together within macros
+
+[dev-dependencies]
+rand = { version = "0.8.5", features = ["std_rng"] }

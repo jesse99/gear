@@ -1,4 +1,6 @@
 use super::*;
+use rand::seq::SliceRandom;
+use rand::Rng;
 use std::collections::HashMap;
 
 // Top-level sim state.
@@ -8,17 +10,23 @@ pub struct World {
     actors: HashMap<Point, Vec<Component>>,
     dummy: Vec<Component>,
     ticks: i32, // incremented each time actors get a chance to act
+    rng: Box<dyn RngCore>,
 }
 
 impl World {
-    pub fn new(width: i32, height: i32) -> World {
+    pub fn new(width: i32, height: i32, rng: Box<dyn RngCore>) -> World {
         World {
             width,
             height,
             actors: HashMap::new(),
             dummy: Vec::new(),
             ticks: 0,
+            rng,
         }
+    }
+
+    pub fn get(&self, loc: Point) -> &Vec<Component> {
+        &self.actors.get(&loc).unwrap_or(&self.dummy)
     }
 
     pub fn add(&mut self, loc: Point, actor: Component) {
@@ -33,9 +41,8 @@ impl World {
         actors.push(actor);
     }
 
-    pub fn get(&self, loc: Point) -> &Vec<Component> {
-        &self.actors.get(&loc).unwrap_or(&self.dummy)
-    }
+    // remove would take a &Component? might need to add some sort of id to Component so
+    // that we can find the right one
 
     /// Return all cells within radius of loc that satisfy the predicate.
     pub fn all<P>(&self, loc: Point, radius: i32, predicate: P) -> Vec<Point>
@@ -62,18 +69,33 @@ impl World {
 
     /// Allow all components a chance to act.
     pub fn step(&mut self) {
-        // This is delicate because we want to mutate actors which may also cause the world
-        // to mutate (e.g. they can add new actors to the world).
-        let locs: Vec<Point> = self.actors.keys().copied().collect(); // TODO: randomize these
+        // 1) This is tricky code because we're iterating over actors which may mutate
+        // themselves or the world or other actors. That's why we temporarily remove an
+        // actor before calling act.
+        // 2) To avoid bias as to execution order we randomize the order in which they
+        // are acted upon.
+        let mut locs: Vec<Point> = self.actors.keys().copied().collect();
+        locs[..].shuffle(&mut self.rng);
         for loc in locs {
             let len = self.len_at(loc);
+            let start: usize = self.rng.gen_range(0..len);
+
+            // TODO: This won't quite work if act removes an earlier actor. Could maybe:
+            // 1) set an executing flag here
+            // 2) remove and add would append onto a deferred action list
+            //    think we only need to do this for removes
+            //    and technically just removes at loc
+            // 3) after re-inserting the original actor run deferred actions
+            //    would have to update the local i variable on removes
+            //    probably len local too
             let mut i = 0;
             while i < len {
-                let mut actor = self.remove_at(loc, i);
+                let index = (start + i) % len;
+                let mut actor = self.remove_at(loc, index);
                 let action = find_trait_mut!(actor, Action).unwrap();
                 let alive = action.act(self, loc);
                 if alive {
-                    self.insert_at(loc, i, actor);
+                    self.insert_at(loc, index, actor);
                     i += 1;
                 }
             }
