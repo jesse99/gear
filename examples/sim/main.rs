@@ -11,11 +11,13 @@ use rand::{RngCore, SeedableRng};
 
 mod grass;
 mod point;
+mod rabbit;
 mod traits;
 mod world;
 
 use grass::*;
 use point::*;
+use rabbit::*;
 use traits::*;
 use world::*;
 
@@ -65,7 +67,15 @@ fn main() {
         add_grass_patch(&mut world, center, radius);
     }
 
-    for _ in 0..10 {
+    for _ in 0..8 {
+        let loc = Point::new(
+            world.rng.gen_range(0..world.width),
+            world.rng.gen_range(0..world.height),
+        );
+        add_rabbit(&mut world, loc);
+    }
+
+    for _ in 0..20 {
         world.render();
         world.step();
     }

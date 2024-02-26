@@ -23,7 +23,7 @@ impl Grass {
 impl Terrain for Grass {}
 
 impl Action for Grass {
-    fn act(&mut self, world: &mut World, loc: Point) -> bool {
+    fn act(&mut self, world: &mut World, _id: ComponentId, loc: Point) -> bool {
         // Grass grows slowly.
         if self.height < u8::MAX - GRASS_DELTA {
             self.height += GRASS_DELTA;

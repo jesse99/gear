@@ -1,5 +1,6 @@
 use super::*;
 use rand::seq::SliceRandom;
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 // Top-level sim state.
@@ -9,7 +10,8 @@ pub struct World {
     pub rng: Box<dyn RngCore>,
     actors: HashMap<Point, Vec<ComponentId>>,
     components: HashMap<ComponentId, Component>,
-    executing: Vec<(Point, ComponentId)>,
+    pending: Vec<(Point, ComponentId)>,
+    executing: (Point, ComponentId),
     dummy: Vec<ComponentId>,
     ticks: i32, // incremented each time actors get a chance to act
 }
@@ -22,7 +24,8 @@ impl World {
             rng,
             actors: HashMap::new(),
             components: HashMap::new(),
-            executing: Vec::new(),
+            pending: Vec::new(),
+            executing: (Point::new(-1, -1), next_component_id()),
             dummy: Vec::new(),
             ticks: 0,
         }
@@ -32,8 +35,32 @@ impl World {
         self.components.get(&id).unwrap()
     }
 
-    pub fn cell(&self, loc: Point) -> &Vec<ComponentId> {
-        &self.actors.get(&loc).unwrap_or(&self.dummy)
+    pub fn cell(&self, loc: Point) -> Cow<Vec<ComponentId>> {
+        if loc == self.executing.0 {
+            // If we're currently executing an id at loc then we cannot return the id
+            // here because callers cannot use it (step temporarily removes it from self.
+            // components). So, when that happens, we return a new vector without that id.
+            // This is potentially a problem if that object wants access to another object
+            // on its component. TODO: can probably fix this by passing the component into
+            // act.
+            //
+            // I experimented with avoiding allocating a new vector by using a RefCell
+            // and returning `impl Iterator<Item=ComponentId> + '_ ` or
+            // `Box<dyn Iterator<Item = &ComponentId> + '_>`or &Vec<ComponentId> but
+            // those didn't work because the iterator types are different and/or the
+            // temporary reference from the RefCell borrow didn't live long enough.
+            let temp = self
+                .actors
+                .get(&loc)
+                .unwrap()
+                .iter()
+                .copied()
+                .take_while(|id| *id != self.executing.1)
+                .collect();
+            Cow::Owned(temp)
+        } else {
+            Cow::Borrowed(self.actors.get(&loc).unwrap_or(&self.dummy))
+        }
     }
 
     pub fn add(&mut self, loc: Point, actor: Component) {
@@ -51,7 +78,16 @@ impl World {
         assert!(old.is_none());
     }
 
-    // remove would have to update self.executing (might want to make this a hashset)
+    pub fn move_to(&mut self, id: ComponentId, old_loc: Point, new_loc: Point) {
+        let old_ids = self.actors.get_mut(&old_loc).unwrap();
+        let index = old_ids.iter().position(|e| *e == id).unwrap();
+        old_ids.remove(index);
+
+        let new_ids = self.actors.entry(new_loc).or_default();
+        new_ids.push(id);
+    }
+
+    // TODO: remove has to update pending (might want to make this a hashset)
 
     /// Return all cells within radius of loc that satisfy the predicate.
     pub fn all<P>(&self, loc: Point, radius: i32, predicate: P) -> Vec<Point>
@@ -85,19 +121,22 @@ impl World {
         // the next go around.
         // 3) To avoid bias as to execution order we randomize the order in which they
         // are acted upon.
-        assert!(self.executing.is_empty());
+        assert!(self.pending.is_empty());
         for (loc, ids) in self.actors.iter() {
             for id in ids {
-                self.executing.push((*loc, *id));
+                self.pending.push((*loc, *id));
             }
         }
-        self.executing[..].shuffle(&mut self.rng);
+        self.pending[..].shuffle(&mut self.rng);
 
-        while !self.executing.is_empty() {
-            let (loc, id) = self.executing.pop().unwrap();
+        while !self.pending.is_empty() {
+            let (loc, id) = self.pending.pop().unwrap();
             let mut actor = self.components.remove(&id).unwrap();
+            let id = actor.id;
+
+            self.executing = (loc, id);
             let action = find_trait_mut!(actor, Action).unwrap();
-            let alive = action.act(self, loc);
+            let alive = action.act(self, id, loc);
             if alive {
                 self.components.insert(id, actor);
             } else {
@@ -107,6 +146,7 @@ impl World {
             }
         }
 
+        self.executing = (Point::new(-1, -1), self.executing.1);
         self.ticks += 1;
     }
 
