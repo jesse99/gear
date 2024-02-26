@@ -132,7 +132,7 @@ impl Action for Rabbit {
         // if there is grass in the cell then eat it
         if let Some(grass_id) = self.find_grass(&context) {
             // TODO: eat the grass, if full don't eat: just bail
-            if context.world.verbose >= 2 {
+            if context.world.verbose >= 1 {
                 print!("rabbit{} at {} is eating grass", context.id, context.loc);
             }
             let new_context = Context {
@@ -149,7 +149,7 @@ impl Action for Rabbit {
         // move closer to grass
         if let Some(dst) = self.move_towards_grass(&context) {
             if let Some(new_loc) = self.move_towards(context.world, context.loc, dst) {
-                if context.world.verbose >= 2 {
+                if context.world.verbose >= 1 {
                     println!(
                         "rabbit{} at {} is moving to {new_loc} towards {dst}",
                         context.id, context.loc
@@ -158,7 +158,7 @@ impl Action for Rabbit {
                 context.world.move_to(context.id, context.loc, new_loc);
                 return true;
             } else {
-                if context.world.verbose >= 2 {
+                if context.world.verbose >= 1 {
                     println!(
                         "rabbit{} at {} can't move to {dst}",
                         context.id, context.loc
@@ -169,7 +169,7 @@ impl Action for Rabbit {
 
         // random move
         if let Some(new_loc) = self.random_move(&context) {
-            if context.world.verbose >= 2 {
+            if context.world.verbose >= 1 {
                 println!(
                     "rabbit{} at {} is doing random move to {new_loc}",
                     context.id, context.loc
@@ -180,7 +180,7 @@ impl Action for Rabbit {
         }
 
         // do nothing
-        if context.world.verbose >= 2 {
+        if context.world.verbose >= 1 {
             println!("rabbit{} at {} did nothing", context.id, context.loc);
         }
         true // TODO: use an enum

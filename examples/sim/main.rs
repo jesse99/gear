@@ -44,7 +44,7 @@ struct Args {
     #[clap(long, value_name = "NUM", default_value_t = 10)]
     ticks: i32,
 
-    /// Print extra information (up to -vvvv)
+    /// Print extra information (up to -vvv)
     #[clap(short, long, action = clap::ArgAction::Count)]
     verbose: u8,
 }

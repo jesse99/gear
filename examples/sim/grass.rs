@@ -39,13 +39,13 @@ impl Fodder for Grass {
     fn eat<'a, 'b>(&mut self, context: Context<'a, 'b>, percent: i32) {
         let delta = (percent * 255 / 100) as u8;
         if self.height <= delta {
-            if context.world.verbose >= 2 {
+            if context.world.verbose >= 1 {
                 println!(", grass is now gone",);
             }
             context.world.remove(context.store, context.id, context.loc);
         } else {
             self.height -= delta;
-            if context.world.verbose >= 2 {
+            if context.world.verbose >= 1 {
                 println!(
                     ", grass went from height {} to {}",
                     self.height + delta,
@@ -63,7 +63,7 @@ impl Action for Grass {
         // Grass grows slowly.
         if self.height < u8::MAX - GRASS_DELTA {
             self.height += GRASS_DELTA;
-            if context.world.verbose >= 4 {
+            if context.world.verbose >= 3 {
                 details += &format!(" grew to {}", self.height);
             }
         }
@@ -79,7 +79,7 @@ impl Action for Grass {
             }) {
                 if context.world.rng().gen_range(0..16) == 0 {
                     spread_grass(context.world, context.store, neighbor);
-                    if context.world.verbose >= 3 {
+                    if context.world.verbose >= 2 {
                         details += &format!(" spread to {neighbor}");
                     }
                 }
