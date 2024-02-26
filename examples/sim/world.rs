@@ -40,9 +40,8 @@ impl World {
             // If we're currently executing an id at loc then we cannot return the id
             // here because callers cannot use it (step temporarily removes it from self.
             // components). So, when that happens, we return a new vector without that id.
-            // This is potentially a problem if that object wants access to another object
-            // on its component. TODO: can probably fix this by passing the component into
-            // act.
+            // This is OK because act is passed its Component so it can make changes to
+            // other objects within that as needed.
             //
             // I experimented with avoiding allocating a new vector by using a RefCell
             // and returning `impl Iterator<Item=ComponentId> + '_ ` or
@@ -136,7 +135,7 @@ impl World {
 
             self.executing = (loc, id);
             let action = find_trait_mut!(actor, Action).unwrap();
-            let alive = action.act(self, id, loc);
+            let alive = action.act(self, &actor, loc);
             if alive {
                 self.components.insert(id, actor);
             } else {

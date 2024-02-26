@@ -90,7 +90,7 @@ impl Rabbit {
 // TODO: finish this up
 impl Action for Rabbit {
     // TODO: might want to add some logging
-    fn act(&mut self, world: &mut World, id: ComponentId, loc: Point) -> bool {
+    fn act(&mut self, world: &mut World, component: &Component, loc: Point) -> bool {
         // if hunger is maxed then die
 
         // if wolves are seen then attempt to move to a square furthest from the wolves
@@ -111,7 +111,7 @@ impl Action for Rabbit {
         if let Some(dst) = self.move_towards_grass(world, loc) {
             if let Some(new_loc) = self.move_towards(&world, loc, dst) {
                 // println!("rabbit at {loc} is moving to {new_loc} towards {dst}");
-                world.move_to(id, loc, new_loc);
+                world.move_to(component.id, loc, new_loc);
                 return true;
             } else {
                 // println!("rabbit at {loc} can't move to {dst}");
@@ -121,7 +121,7 @@ impl Action for Rabbit {
         // random move
         if let Some(new_loc) = self.random_move(world, loc) {
             // println!("rabbit at {loc} is doing random move to {new_loc}");
-            world.move_to(id, loc, new_loc);
+            world.move_to(component.id, loc, new_loc);
             return true;
         }
 
