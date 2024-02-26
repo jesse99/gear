@@ -35,14 +35,17 @@ impl World {
         &self.actors.get(&loc).unwrap_or(&self.dummy)
     }
 
-    pub fn add(&mut self, loc: Point, id: ComponentId) {
+    pub fn add(&mut self, store: &Store, loc: Point, component: Component) {
         assert!(loc.x >= 0);
         assert!(loc.y >= 0);
         assert!(loc.x < self.width);
         assert!(loc.y < self.height);
+        assert!(has_trait!(component, Action)); // required traits, objects may make use of others
+        assert!(has_trait!(component, Render));
 
         let actors = self.actors.entry(loc).or_default();
-        actors.push(id);
+        actors.push(component.id);
+        store.add(component)
     }
 
     pub fn move_to(&mut self, id: ComponentId, old_loc: Point, new_loc: Point) {
@@ -54,10 +57,11 @@ impl World {
         new_ids.push(id);
     }
 
-    pub fn remove(&mut self, id: ComponentId, loc: Point) {
+    pub fn remove(&mut self, store: &Store, id: ComponentId, loc: Point) {
         let old_ids = self.actors.get_mut(&loc).unwrap();
         let index = old_ids.iter().position(|e| *e == id).unwrap();
         old_ids.remove(index);
+        store.remove(id);
 
         if let Some(index) = self
             .pending

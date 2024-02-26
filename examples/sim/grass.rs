@@ -11,8 +11,7 @@ register_type!(Grass);
 pub fn add_grass(world: &mut World, store: &Store, loc: Point) {
     let mut component = Component::new();
     add_object!(component, Grass, Grass::new(), [Action, Render, Fodder]);
-    world.add(loc, component.id);
-    store.add(component)
+    world.add(store, loc, component);
 }
 
 impl Grass {
@@ -25,8 +24,7 @@ impl Fodder for Grass {
     fn eat<'a, 'b>(&mut self, context: Context<'a, 'b>, percent: i32) {
         if self.height <= percent as u8 {
             // TODO: use as percent
-            context.world.remove(context.id, context.loc);
-            context.store.remove(context.id);
+            context.world.remove(context.store, context.id, context.loc);
         } else {
             self.height -= percent as u8;
         }

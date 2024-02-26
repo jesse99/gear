@@ -15,8 +15,7 @@ register_type!(Rabbit);
 pub fn add_rabbit(world: &mut World, store: &Store, loc: Point) {
     let mut component = Component::new();
     add_object!(component, Rabbit, Rabbit::new(), [Action, Animal, Render]);
-    world.add(loc, component.id);
-    store.add(component);
+    world.add(store, loc, component);
 }
 
 impl Rabbit {
@@ -44,7 +43,7 @@ impl Rabbit {
                 .world
                 .cell(pt)
                 .iter()
-                .any(|id| has_trait!(context.store.get(*id), Fodder)) // TODO: use Fodder
+                .any(|id| has_trait!(context.store.get(*id), Fodder))
         }) {
             let candidate = neighbor.distance2(context.loc);
             if candidate < dist {
