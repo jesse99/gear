@@ -8,7 +8,6 @@ use std::hash::{Hash, Hasher};
 use std::marker::Unsize;
 use std::mem::transmute;
 use std::ptr::{self, DynMetadata, Pointee};
-use std::sync::atomic::Ordering;
 
 /// The unit of composition for the gear object model.
 /// A component consists  of one or more objects. Each object implements one or more
@@ -26,7 +25,7 @@ pub struct Component {
 impl Component {
     pub fn new() -> Component {
         Component {
-            id: unique_component_id!(),
+            id: next_component_id(),
             objects: FnvHashMap::default(),
             traits: FnvHashMap::default(),
             repeated: FnvHashMap::default(),
@@ -450,6 +449,7 @@ mod tests {
     use super::*;
     use std::fmt::{self, Display};
     use std::sync::atomic::AtomicU8;
+    use std::sync::atomic::Ordering;
 
     trait Fruit {
         fn eat(&self) -> String;
