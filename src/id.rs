@@ -1,5 +1,4 @@
-use core::sync::atomic::{AtomicU16, Ordering};
-use std::sync::LazyLock;
+use core::sync::atomic::AtomicU16;
 
 /// Used to identify trait and object types. Note that these are generally not directly
 /// used by client code.

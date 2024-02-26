@@ -1,6 +1,5 @@
 use super::*;
 use rand::seq::SliceRandom;
-use rand::Rng;
 use std::collections::HashMap;
 
 // Top-level sim state.
@@ -69,6 +68,13 @@ impl World {
 
     /// Allow all components a chance to act.
     pub fn step(&mut self) {
+        // TODO:
+        // actors should be {Point => [ID]}
+        //    then have {ID => Component}
+        // here we could assemble a randomized list of IDs to act on
+        //    save this list in a field
+        // remove would erase that id from list to process
+
         // 1) This is tricky code because we're iterating over actors which may mutate
         // themselves or the world or other actors. That's why we temporarily remove an
         // actor before calling act.

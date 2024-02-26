@@ -1,5 +1,7 @@
+#[allow(unused_imports)]
 use super::{unique_id, ID};
 use fnv::FnvHashMap;
+#[allow(unused_imports)]
 use paste::paste;
 use std::any::Any;
 use std::marker::Unsize;
