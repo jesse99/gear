@@ -37,6 +37,7 @@ impl Rabbit {
     fn move_towards_grass<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<Point> {
         let mut dst = None;
         let mut dist = i32::MAX;
+        let mut height = 0;
 
         for neighbor in context.world.all(context.loc, VISION_RADIUS, |pt| {
             context
@@ -45,10 +46,23 @@ impl Rabbit {
                 .iter()
                 .any(|id| has_trait!(context.store.get(*id), Fodder))
         }) {
-            let candidate = neighbor.distance2(context.loc);
-            if candidate < dist {
-                dst = Some(neighbor);
-                dist = candidate;
+            for id in context.world.cell(neighbor) {
+                let component = context.store.get(*id);
+                if let Some(fodder) = find_trait!(component, Fodder) {
+                    if fodder.height() > height {
+                        // move towards cells that have more grass
+                        dst = Some(neighbor);
+                        dist = neighbor.distance2(context.loc);
+                        height = fodder.height();
+                    } else if fodder.height() == height {
+                        // or to the closest cell for a particular height
+                        let candidate = neighbor.distance2(context.loc);
+                        if candidate < dist {
+                            dst = Some(neighbor);
+                            dist = candidate;
+                        }
+                    }
+                }
             }
         }
         dst
@@ -118,7 +132,9 @@ impl Action for Rabbit {
         // if there is grass in the cell then eat it
         if let Some(grass_id) = self.find_grass(&context) {
             // TODO: eat the grass, if full don't eat: just bail
-            // println!("rabbit at {loc} is eating grass");
+            if context.world.verbose >= 2 {
+                print!("rabbit{} at {} is eating grass", context.id, context.loc);
+            }
             let new_context = Context {
                 id: grass_id,
                 ..context
@@ -133,23 +149,40 @@ impl Action for Rabbit {
         // move closer to grass
         if let Some(dst) = self.move_towards_grass(&context) {
             if let Some(new_loc) = self.move_towards(context.world, context.loc, dst) {
-                // println!("rabbit at {loc} is moving to {new_loc} towards {dst}");
+                if context.world.verbose >= 2 {
+                    println!(
+                        "rabbit{} at {} is moving to {new_loc} towards {dst}",
+                        context.id, context.loc
+                    );
+                }
                 context.world.move_to(context.id, context.loc, new_loc);
                 return true;
             } else {
-                // println!("rabbit at {loc} can't move to {dst}");
+                if context.world.verbose >= 2 {
+                    println!(
+                        "rabbit{} at {} can't move to {dst}",
+                        context.id, context.loc
+                    );
+                }
             }
         }
 
         // random move
         if let Some(new_loc) = self.random_move(&context) {
-            // println!("rabbit at {loc} is doing random move to {new_loc}");
+            if context.world.verbose >= 2 {
+                println!(
+                    "rabbit{} at {} is doing random move to {new_loc}",
+                    context.id, context.loc
+                );
+            }
             context.world.move_to(context.id, context.loc, new_loc);
             return true;
         }
 
         // do nothing
-        // println!("rabbit at {loc} did nothing");
+        if context.world.verbose >= 2 {
+            println!("rabbit{} at {} did nothing", context.id, context.loc);
+        }
         true // TODO: use an enum
     }
 }

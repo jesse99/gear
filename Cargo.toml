@@ -10,4 +10,6 @@ fnv = "1.0"   # custom hasher that is much more performant for small keys
 paste = "1.0" # allows identifiers to be pasted together within macros
 
 [dev-dependencies]
-rand = { version = "0.8.5", features = ["std_rng"] }
+chrono = "0.4.31"                                  # time library
+clap = { version = "4.4", features = ["derive"] }  # command line parser
+rand = { version = "0.8", features = ["std_rng"] } # random number generator

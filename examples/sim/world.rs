@@ -7,6 +7,7 @@ use std::collections::HashMap;
 pub struct World {
     pub width: i32,
     pub height: i32,
+    pub verbose: u8,
     rng: RefCell<Box<dyn RngCore>>,
     actors: HashMap<Point, Vec<ComponentId>>,
     pending: Vec<(Point, ComponentId)>,
@@ -15,10 +16,11 @@ pub struct World {
 }
 
 impl World {
-    pub fn new(width: i32, height: i32, rng: Box<dyn RngCore>) -> World {
+    pub fn new(width: i32, height: i32, rng: Box<dyn RngCore>, verbose: u8) -> World {
         World {
             width,
             height,
+            verbose,
             rng: RefCell::new(rng),
             actors: HashMap::new(),
             pending: Vec::new(),

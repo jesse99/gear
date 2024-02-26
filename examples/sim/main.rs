@@ -2,6 +2,8 @@
 #![feature(ptr_metadata)]
 #![feature(unsize)]
 
+use chrono::Utc;
+use clap::Parser;
 use core::sync::atomic::Ordering;
 use gear::*;
 use paste::paste;
@@ -23,6 +25,30 @@ use store::*;
 use traits::*;
 use world::*;
 
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    /// Number of grass patchs to start with
+    #[clap(long, value_name = "COUNT", default_value_t = 4)]
+    grass: i32,
+
+    /// Number of rabbits to start with
+    #[clap(long, value_name = "COUNT", default_value_t = 8)]
+    rabbits: i32,
+
+    /// Random number seed (defaults to random)
+    #[clap(long, value_name = "NUM")]
+    seed: Option<u64>,
+
+    /// Number of times to run the sim
+    #[clap(long, value_name = "NUM", default_value_t = 10)]
+    ticks: i32,
+
+    /// Print extra information (up to -vvvv)
+    #[clap(short, long, action = clap::ArgAction::Count)]
+    verbose: u8,
+}
+
 fn add_grass_patch(world: &mut World, store: &Store, center: Point, radius: i32) {
     for dy in -radius..=radius {
         let y = center.y + dy;
@@ -43,7 +69,6 @@ fn add_grass_patch(world: &mut World, store: &Store, center: Point, radius: i32)
 }
 
 // TODO:
-// add rabbits, think we want a Fodder trait (possibly get rid of Terrain)
 // rabbits should eat grass (will need to fixup step if grass is all eaten up)
 // rabbits should starve (leave a skeleton behind for a bit? kind of interferes tho)
 // rabbits should reproduce
@@ -57,11 +82,14 @@ fn add_grass_patch(world: &mut World, store: &Store, center: Point, radius: i32)
 // track stats over time?
 // add some sort of readme
 fn main() {
-    let mut rng = StdRng::seed_from_u64(1);
-    let mut world = World::new(20, 20, Box::new(rng.clone()));
+    let options = Args::parse();
+
+    let seed = options.seed.unwrap_or(Utc::now().timestamp_millis() as u64);
+    let mut rng = StdRng::seed_from_u64(seed);
+    let mut world = World::new(20, 20, Box::new(rng.clone()), options.verbose);
     let mut store = Store::new();
 
-    for _ in 0..4 {
+    for _ in 0..options.grass {
         let radius: i32 = rng.gen_range(1..10);
         let center = Point::new(
             rng.gen_range(0..world.width),
@@ -70,7 +98,7 @@ fn main() {
         add_grass_patch(&mut world, &store, center, radius);
     }
 
-    for _ in 0..8 {
+    for _ in 0..options.rabbits {
         let loc = Point::new(
             rng.gen_range(0..world.width),
             rng.gen_range(0..world.height),
@@ -79,7 +107,7 @@ fn main() {
     }
 
     store.sync();
-    for _ in 0..20 {
+    for _ in 0..options.ticks {
         world.render(&store);
         world.step(&mut store);
     }
