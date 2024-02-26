@@ -22,11 +22,11 @@ impl Grass {
 
 impl Fodder for Grass {
     fn eat<'a, 'b>(&mut self, context: Context<'a, 'b>, percent: i32) {
-        if self.height <= percent as u8 {
-            // TODO: use as percent
+        let delta = (percent * 255 / 100) as u8;
+        if self.height <= delta {
             context.world.remove(context.store, context.id, context.loc);
         } else {
-            self.height -= percent as u8;
+            self.height -= delta;
         }
     }
 }
@@ -45,7 +45,7 @@ impl Action for Grass {
                     .world
                     .cell(pt)
                     .iter()
-                    .all(|id| !has_trait!(context.store.get(*id), Fodder))
+                    .all(|id| pt != context.loc && !has_trait!(context.store.get(*id), Fodder))
             }) {
                 add_grass(context.world, context.store, neighbor);
             }

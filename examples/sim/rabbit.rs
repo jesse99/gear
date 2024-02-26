@@ -61,7 +61,7 @@ impl Rabbit {
                 .world
                 .cell(pt)
                 .iter()
-                .all(|id| !has_trait!(context.store.get(*id), Animal))
+                .all(|id| pt != context.loc && !has_trait!(context.store.get(*id), Animal))
         });
         let choice = neighbors
             .iter()
@@ -72,7 +72,7 @@ impl Rabbit {
         }
 
         // Then try to move anywhere.
-        let neighbors = context.world.all(context.loc, 1, |_pt| true);
+        let neighbors = context.world.all(context.loc, 1, |pt| pt != context.loc);
         neighbors
             .iter()
             .choose(context.world.rng().as_mut())

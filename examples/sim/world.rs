@@ -85,7 +85,7 @@ impl World {
                     let x = loc.x + dx;
                     if x >= 0 && x < self.width {
                         let candidate = Point::new(x, y);
-                        if candidate != loc && predicate(candidate) {
+                        if predicate(candidate) {
                             cells.push(candidate);
                         }
                     }
