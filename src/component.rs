@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-use super::{unique_id, ID};
+use super::{unique_type_id, TypeId};
 use fnv::FnvHashMap;
 #[allow(unused_imports)]
 use paste::paste;
@@ -14,9 +14,9 @@ use std::ptr::{self, DynMetadata, Pointee};
 /// Note that publicly released traits should be treated as immutable to foster backward
 /// compatibility.
 pub struct Component {
-    objects: FnvHashMap<ID, Box<dyn Any>>, // object id => type erased boxed object
-    traits: FnvHashMap<ID, TypeErasedPointer>, // trait id => type erased trait pointer
-    repeated: FnvHashMap<ID, Vec<TypeErasedPointer>>, // trait id => [type erased trait pointer]
+    objects: FnvHashMap<TypeId, Box<dyn Any>>, // object id => type erased boxed object
+    traits: FnvHashMap<TypeId, TypeErasedPointer>, // trait id => type erased trait pointer
+    repeated: FnvHashMap<TypeId, Vec<TypeErasedPointer>>, // trait id => [type erased trait pointer]
     empty: Vec<TypeErasedPointer>,
 }
 
@@ -31,7 +31,7 @@ impl Component {
     }
 
     /// Normally the [`add_object`]` macro would be used instead of calling this directly.
-    pub fn add_trait<Trait, Object>(&mut self, trait_id: ID, obj_ptr: *mut Object)
+    pub fn add_trait<Trait, Object>(&mut self, trait_id: TypeId, obj_ptr: *mut Object)
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
         Object: Unsize<Trait> + 'static,
@@ -42,7 +42,7 @@ impl Component {
     }
 
     /// Normally the [`add_object`]` macro would be used instead of calling this directly.
-    pub fn add_repeated_trait<Trait, Object>(&mut self, trait_id: ID, obj_ptr: *mut Object)
+    pub fn add_repeated_trait<Trait, Object>(&mut self, trait_id: TypeId, obj_ptr: *mut Object)
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
         Object: Unsize<Trait> + 'static,
@@ -53,7 +53,7 @@ impl Component {
     }
 
     /// Normally the [`add_object`]` macro would be used instead of calling this directly.
-    pub fn add_object<Object>(&mut self, obj_id: ID, obj_ptr: *mut Object)
+    pub fn add_object<Object>(&mut self, obj_id: TypeId, obj_ptr: *mut Object)
     where
         Object: 'static,
     {
@@ -65,7 +65,7 @@ impl Component {
     }
 
     /// Normally the [`has_trait`]` macro would be used instead of calling this directly.
-    pub fn has<Trait>(&self, trait_id: ID) -> bool
+    pub fn has<Trait>(&self, trait_id: TypeId) -> bool
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
@@ -73,7 +73,7 @@ impl Component {
     }
 
     /// Normally the [`find_trait`]` macro would be used instead of calling this directly.
-    pub fn find<Trait>(&self, trait_id: ID) -> Option<&Trait>
+    pub fn find<Trait>(&self, trait_id: TypeId) -> Option<&Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
@@ -86,7 +86,7 @@ impl Component {
     }
 
     /// Normally the [`find_trait_mut`]` macro would be used instead of calling this directly.
-    pub fn find_mut<Trait>(&mut self, trait_id: ID) -> Option<&mut Trait>
+    pub fn find_mut<Trait>(&mut self, trait_id: TypeId) -> Option<&mut Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
@@ -99,7 +99,7 @@ impl Component {
     }
 
     /// Normally the [`find_repeated_trait`]` macro would be used instead of calling this directly.
-    pub fn find_repeated<Trait>(&self, trait_id: ID) -> impl Iterator<Item = &Trait>
+    pub fn find_repeated<Trait>(&self, trait_id: TypeId) -> impl Iterator<Item = &Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
@@ -111,7 +111,7 @@ impl Component {
     }
 
     /// Normally the [`find_repeated_trait_mut`]` macro would be used instead of calling this directly.
-    pub fn find_repeated_mut<Trait>(&mut self, trait_id: ID) -> impl Iterator<Item = &mut Trait>
+    pub fn find_repeated_mut<Trait>(&mut self, trait_id: TypeId) -> impl Iterator<Item = &mut Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
@@ -142,8 +142,8 @@ impl Component {
 macro_rules! register_type {
     ($type:ty) => {
         paste! {
-            pub fn [<get_ $type:lower _id>]() -> ID {
-                unique_id!()
+            pub fn [<get_ $type:lower _id>]() -> TypeId {
+                unique_type_id!()
             }
         }
     };
@@ -418,7 +418,7 @@ impl TypeErasedPointer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::NEXT_ID;
+    use crate::NEXT_TYPE_ID;
     use std::fmt::{self, Display};
     use std::sync::atomic::{AtomicU8, Ordering};
 

@@ -3,7 +3,7 @@
 #![feature(unsize)]
 
 mod component;
-mod id;
+mod type_id;
 
 pub use component::*;
-pub use id::*;
+pub use type_id::*;
