@@ -12,10 +12,11 @@ pub struct Rabbit {
 }
 register_type!(Rabbit);
 
-pub fn add_rabbit(world: &mut World, loc: Point) {
-    let mut actor = Component::new();
-    add_object!(actor, Rabbit, Rabbit::new(), [Action, Animal, Render]);
-    world.add(loc, actor);
+pub fn add_rabbit(world: &mut World, store: &Store, loc: Point) {
+    let mut component = Component::new();
+    add_object!(component, Rabbit, Rabbit::new(), [Action, Animal, Render]);
+    world.add(loc, component.id);
+    store.add(component);
 }
 
 impl Rabbit {
@@ -25,25 +26,27 @@ impl Rabbit {
         }
     }
 
-    fn find_grass(&self, world: &mut World, loc: Point) -> Option<ComponentId> {
-        world
-            .cell(loc)
+    fn find_grass<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<ComponentId> {
+        context
+            .world
+            .cell(context.loc)
             .iter()
             .copied()
-            .find(|id| has_trait!(world.get(*id), Fodder))
+            .find(|id| has_trait!(context.store.get(*id), Fodder))
     }
 
-    fn move_towards_grass(&self, world: &mut World, loc: Point) -> Option<Point> {
+    fn move_towards_grass<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<Point> {
         let mut dst = None;
         let mut dist = i32::MAX;
 
-        for neighbor in world.all(loc, VISION_RADIUS, |pt| {
-            world
+        for neighbor in context.world.all(context.loc, VISION_RADIUS, |pt| {
+            context
+                .world
                 .cell(pt)
                 .iter()
-                .any(|id| has_trait!(world.get(*id), Fodder)) // TODO: use Fodder
+                .any(|id| has_trait!(context.store.get(*id), Fodder)) // TODO: use Fodder
         }) {
-            let candidate = neighbor.distance2(loc);
+            let candidate = neighbor.distance2(context.loc);
             if candidate < dist {
                 dst = Some(neighbor);
                 dist = candidate;
@@ -52,22 +55,29 @@ impl Rabbit {
         dst
     }
 
-    fn random_move(&self, world: &mut World, loc: Point) -> Option<Point> {
+    fn random_move<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<Point> {
         // First try to move to a cell without another rabbit (or wolf).
-        let neighbors = world.all(loc, 1, |pt| {
-            world
+        let neighbors = context.world.all(context.loc, 1, |pt| {
+            context
+                .world
                 .cell(pt)
                 .iter()
-                .all(|id| !has_trait!(world.get(*id), Animal))
+                .all(|id| !has_trait!(context.store.get(*id), Animal))
         });
-        let choice = neighbors.iter().choose(&mut world.rng).copied();
+        let choice = neighbors
+            .iter()
+            .choose(context.world.rng().as_mut())
+            .copied();
         if choice.is_some() {
             return choice;
         }
 
         // Then try to move anywhere.
-        let neighbors = world.all(loc, 1, |_pt| true);
-        neighbors.iter().choose(&mut world.rng).copied()
+        let neighbors = context.world.all(context.loc, 1, |_pt| true);
+        neighbors
+            .iter()
+            .choose(context.world.rng().as_mut())
+            .copied()
     }
 
     fn move_towards(&self, world: &World, loc: Point, dst: Point) -> Option<Point> {
@@ -97,7 +107,7 @@ impl Rabbit {
 // TODO: finish this up
 impl Action for Rabbit {
     // TODO: might want to add some logging
-    fn act(&mut self, world: &mut World, component: &Component, loc: Point) -> bool {
+    fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> bool {
         // if hunger is maxed then die
 
         // if wolves are seen then attempt to move to a square furthest from the wolves
@@ -107,20 +117,25 @@ impl Action for Rabbit {
         //    both rabbits should be hungry afterwards
 
         // if there is grass in the cell then eat it
-        if let Some(grass_id) = self.find_grass(world, loc) {
+        if let Some(grass_id) = self.find_grass(&context) {
             // TODO: eat the grass, if full don't eat: just bail
             // println!("rabbit at {loc} is eating grass");
-            let fodder = find_trait_mut!(world.get(grass_id), Fodder).unwrap();
-            fodder.eat(world, grass_id, loc, 25);
+            let new_context = Context {
+                id: grass_id,
+                ..context
+            };
+            let component = context.store.get(grass_id);
+            let fodder = find_trait_mut!(component, Fodder).unwrap();
+            fodder.eat(new_context, 25);
             return true;
         }
         // TODO: otherwise get hungrier
 
         // move closer to grass
-        if let Some(dst) = self.move_towards_grass(world, loc) {
-            if let Some(new_loc) = self.move_towards(&world, loc, dst) {
+        if let Some(dst) = self.move_towards_grass(&context) {
+            if let Some(new_loc) = self.move_towards(context.world, context.loc, dst) {
                 // println!("rabbit at {loc} is moving to {new_loc} towards {dst}");
-                world.move_to(component.id, loc, new_loc);
+                context.world.move_to(context.id, context.loc, new_loc);
                 return true;
             } else {
                 // println!("rabbit at {loc} can't move to {dst}");
@@ -128,9 +143,9 @@ impl Action for Rabbit {
         }
 
         // random move
-        if let Some(new_loc) = self.random_move(world, loc) {
+        if let Some(new_loc) = self.random_move(&context) {
             // println!("rabbit at {loc} is doing random move to {new_loc}");
-            world.move_to(component.id, loc, new_loc);
+            context.world.move_to(context.id, context.loc, new_loc);
             return true;
         }
 

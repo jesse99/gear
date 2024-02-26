@@ -12,16 +12,18 @@ use rand::{RngCore, SeedableRng};
 mod grass;
 mod point;
 mod rabbit;
+mod store;
 mod traits;
 mod world;
 
 use grass::*;
 use point::*;
 use rabbit::*;
+use store::*;
 use traits::*;
 use world::*;
 
-fn add_grass_patch(world: &mut World, center: Point, radius: i32) {
+fn add_grass_patch(world: &mut World, store: &Store, center: Point, radius: i32) {
     for dy in -radius..=radius {
         let y = center.y + dy;
         if y >= 0 && y < world.height {
@@ -31,7 +33,7 @@ fn add_grass_patch(world: &mut World, center: Point, radius: i32) {
                     let loc = Point::new(x, y);
                     if center.distance2(loc) < radius {
                         if world.cell(loc).is_empty() {
-                            add_grass(world, loc);
+                            add_grass(world, store, loc);
                         }
                     }
                 }
@@ -55,28 +57,30 @@ fn add_grass_patch(world: &mut World, center: Point, radius: i32) {
 // track stats over time?
 // add some sort of readme
 fn main() {
-    let rng = StdRng::seed_from_u64(1);
-    let mut world = World::new(20, 20, Box::new(rng));
+    let mut rng = StdRng::seed_from_u64(1);
+    let mut world = World::new(20, 20, Box::new(rng.clone()));
+    let mut store = Store::new();
 
     for _ in 0..4 {
-        let radius: i32 = world.rng.gen_range(1..10);
+        let radius: i32 = rng.gen_range(1..10);
         let center = Point::new(
-            world.rng.gen_range(0..world.width),
-            world.rng.gen_range(0..world.height),
+            rng.gen_range(0..world.width),
+            rng.gen_range(0..world.height),
         );
-        add_grass_patch(&mut world, center, radius);
+        add_grass_patch(&mut world, &store, center, radius);
     }
 
     for _ in 0..8 {
         let loc = Point::new(
-            world.rng.gen_range(0..world.width),
-            world.rng.gen_range(0..world.height),
+            rng.gen_range(0..world.width),
+            rng.gen_range(0..world.height),
         );
-        add_rabbit(&mut world, loc);
+        add_rabbit(&mut world, &store, loc);
     }
 
+    store.sync();
     for _ in 0..20 {
-        world.render();
-        world.step();
+        world.render(&store);
+        world.step(&mut store);
     }
 }

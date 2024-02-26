@@ -8,10 +8,11 @@ pub struct Grass {
 }
 register_type!(Grass);
 
-pub fn add_grass(world: &mut World, loc: Point) {
-    let mut actor = Component::new();
-    add_object!(actor, Grass, Grass::new(), [Action, Render, Fodder]);
-    world.add(loc, actor);
+pub fn add_grass(world: &mut World, store: &Store, loc: Point) {
+    let mut component = Component::new();
+    add_object!(component, Grass, Grass::new(), [Action, Render, Fodder]);
+    world.add(loc, component.id);
+    store.add(component)
 }
 
 impl Grass {
@@ -21,10 +22,11 @@ impl Grass {
 }
 
 impl Fodder for Grass {
-    fn eat(&mut self, world: &mut World, id: ComponentId, loc: Point, percent: i32) {
+    fn eat<'a, 'b>(&mut self, context: Context<'a, 'b>, percent: i32) {
         if self.height <= percent as u8 {
             // TODO: use as percent
-            world.remove(id, loc);
+            context.world.remove(context.id, context.loc);
+            context.store.remove(context.id);
         } else {
             self.height -= percent as u8;
         }
@@ -32,7 +34,7 @@ impl Fodder for Grass {
 }
 
 impl Action for Grass {
-    fn act(&mut self, world: &mut World, _component: &Component, loc: Point) -> bool {
+    fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> bool {
         // Grass grows slowly.
         if self.height < u8::MAX - GRASS_DELTA {
             self.height += GRASS_DELTA;
@@ -40,13 +42,14 @@ impl Action for Grass {
 
         // Once grass has grown enough it starts spreading.
         if self.height > 2 * GRASS_DELTA {
-            for neighbor in world.all(loc, 1, |pt| {
-                world
+            for neighbor in context.world.all(context.loc, 1, |pt| {
+                context
+                    .world
                     .cell(pt)
                     .iter()
-                    .all(|id| !has_trait!(world.get(*id), Fodder))
+                    .all(|id| !has_trait!(context.store.get(*id), Fodder))
             }) {
-                add_grass(world, neighbor);
+                add_grass(context.world, context.store, neighbor);
             }
         }
         true

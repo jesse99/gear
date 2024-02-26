@@ -1,10 +1,17 @@
 //! Standard traits for components added to the world.
 use super::*;
 
+pub struct Context<'a, 'b> {
+    pub world: &'a mut World,
+    pub store: &'b Store,
+    pub loc: Point,
+    pub id: ComponentId,
+}
+
 /// Every component should include this though it can be a no-op.
 pub trait Action {
-    /// Returns true if the actor is still alive.
-    fn act(&mut self, world: &mut World, component: &Component, loc: Point) -> bool; // TODO: use an enum instead of a bool
+    /// Returns true if the component is still alive.
+    fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> bool; // TODO: use an enum instead of a bool
 }
 register_type!(Action);
 // ---------------------------------------------------------------------------------------
@@ -19,7 +26,7 @@ register_type!(Render);
 /// Something rabbits can eat.
 pub trait Fodder {
     // Percent is how much of the fodder rabbits eat at a time.
-    fn eat(&mut self, world: &mut World, id: ComponentId, loc: Point, percent: i32);
+    fn eat<'a, 'b>(&mut self, context: Context<'a, 'b>, percent: i32);
 }
 register_type!(Fodder);
 // ---------------------------------------------------------------------------------------
