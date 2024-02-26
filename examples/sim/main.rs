@@ -28,7 +28,7 @@ fn add_grass_patch(world: &mut World, center: Point, radius: i32) {
                 if x >= 0 && x < world.width {
                     let loc = Point::new(x, y);
                     if center.distance2(loc) < radius {
-                        if world.get(loc).is_empty() {
+                        if world.cell(loc).is_empty() {
                             add_grass(world, loc);
                         }
                     }
