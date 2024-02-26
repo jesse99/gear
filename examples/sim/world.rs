@@ -86,7 +86,21 @@ impl World {
         new_ids.push(id);
     }
 
-    // TODO: remove has to update pending (might want to make this a hashset)
+    pub fn remove(&mut self, id: ComponentId, loc: Point) {
+        let old_ids = self.actors.get_mut(&loc).unwrap();
+        let index = old_ids.iter().position(|e| *e == id).unwrap();
+        old_ids.remove(index);
+
+        self.components.remove(&id);
+
+        if let Some(index) = self
+            .pending
+            .iter()
+            .position(|(pt, i)| *pt == loc && *i == id)
+        {
+            self.pending.remove(index);
+        }
+    }
 
     /// Return all cells within radius of loc that satisfy the predicate.
     pub fn all<P>(&self, loc: Point, radius: i32, predicate: P) -> Vec<Point>

@@ -5,7 +5,11 @@ use super::*;
 
 const VISION_RADIUS: i32 = 4; // rabbits don't have great vision
 
-pub struct Rabbit {}
+const MAX_HUNGER: i32 = 100;
+
+pub struct Rabbit {
+    hunger: i32, // [0, MAX_HUNGER)
+}
 register_type!(Rabbit);
 
 pub fn add_rabbit(world: &mut World, loc: Point) {
@@ -16,14 +20,17 @@ pub fn add_rabbit(world: &mut World, loc: Point) {
 
 impl Rabbit {
     pub fn new() -> Rabbit {
-        Rabbit {}
+        Rabbit {
+            hunger: MAX_HUNGER / 2,
+        }
     }
 
-    fn has_grass(&self, world: &mut World, loc: Point) -> bool {
+    fn find_grass(&self, world: &mut World, loc: Point) -> Option<ComponentId> {
         world
             .cell(loc)
             .iter()
-            .any(|id| has_trait!(world.get(*id), Terrain)) // TODO: use Fodder
+            .copied()
+            .find(|id| has_trait!(world.get(*id), Fodder))
     }
 
     fn move_towards_grass(&self, world: &mut World, loc: Point) -> Option<Point> {
@@ -34,7 +41,7 @@ impl Rabbit {
             world
                 .cell(pt)
                 .iter()
-                .any(|id| has_trait!(world.get(*id), Terrain)) // TODO: use Fodder
+                .any(|id| has_trait!(world.get(*id), Fodder)) // TODO: use Fodder
         }) {
             let candidate = neighbor.distance2(loc);
             if candidate < dist {
@@ -100,9 +107,11 @@ impl Action for Rabbit {
         //    both rabbits should be hungry afterwards
 
         // if there is grass in the cell then eat it
-        if self.has_grass(world, loc) {
+        if let Some(grass_id) = self.find_grass(world, loc) {
             // TODO: eat the grass, if full don't eat: just bail
             // println!("rabbit at {loc} is eating grass");
+            let fodder = find_trait_mut!(world.get(grass_id), Fodder).unwrap();
+            fodder.eat(world, grass_id, loc, 25);
             return true;
         }
         // TODO: otherwise get hungrier

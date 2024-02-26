@@ -10,7 +10,7 @@ register_type!(Grass);
 
 pub fn add_grass(world: &mut World, loc: Point) {
     let mut actor = Component::new();
-    add_object!(actor, Grass, Grass::new(), [Action, Render, Terrain]);
+    add_object!(actor, Grass, Grass::new(), [Action, Render, Fodder]);
     world.add(loc, actor);
 }
 
@@ -20,7 +20,16 @@ impl Grass {
     }
 }
 
-impl Terrain for Grass {}
+impl Fodder for Grass {
+    fn eat(&mut self, world: &mut World, id: ComponentId, loc: Point, percent: i32) {
+        if self.height <= percent as u8 {
+            // TODO: use as percent
+            world.remove(id, loc);
+        } else {
+            self.height -= percent as u8;
+        }
+    }
+}
 
 impl Action for Grass {
     fn act(&mut self, world: &mut World, _component: &Component, loc: Point) -> bool {
@@ -35,7 +44,7 @@ impl Action for Grass {
                 world
                     .cell(pt)
                     .iter()
-                    .all(|id| !has_trait!(world.get(*id), Terrain))
+                    .all(|id| !has_trait!(world.get(*id), Fodder))
             }) {
                 add_grass(world, neighbor);
             }
