@@ -1,6 +1,4 @@
 //! Animal that eats grass and is eaten by wolves.
-use std::str::CharIndices;
-
 use rand::seq::IteratorRandom;
 
 use super::*;

@@ -149,7 +149,9 @@ impl World {
     }
 
     /// Render all cells to the terminal.
-    pub fn render(&self, store: &Store) {
+    pub fn render(&self, store: &Store) -> LifeCycle {
+        let mut cycle = LifeCycle::Dead;
+
         println!("ticks: {}", self.ticks);
         if self.verbose >= 1 {
             print!("  ");
@@ -167,7 +169,11 @@ impl World {
                 if let Some(id) = self.actors.get(&loc).map(|v| v.last()).flatten() {
                     let component = store.get(*id);
                     let render = find_trait!(component, Render).unwrap();
-                    print!("{}", render.render());
+                    let ch = render.render();
+                    if ch != '|' && ch != ' ' {
+                        cycle = LifeCycle::Alive;
+                    }
+                    print!("{}", ch);
                 } else {
                     print!(" ");
                 }
@@ -176,5 +182,6 @@ impl World {
         }
         println!();
         println!("{}", "-".repeat(self.width as usize));
+        cycle
     }
 }

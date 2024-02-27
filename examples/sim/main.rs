@@ -126,6 +126,9 @@ fn main() {
     world.render(&store);
     for _ in 0..options.ticks {
         world.step(&mut store);
-        world.render(&store);
+        if world.render(&store) == LifeCycle::Dead {
+            println!("Stopping early: world has stabilized");
+            break;
+        }
     }
 }
