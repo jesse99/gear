@@ -29,10 +29,18 @@ pub trait Render {
 register_type!(Render);
 // ---------------------------------------------------------------------------------------
 
+/// Something that gets hungry.
+pub trait Hunger {
+    fn get(&self) -> i32;
+    fn set(&mut self, value: i32);
+    fn adjust(&mut self, delta: i32);
+}
+register_type!(Hunger);
+// ---------------------------------------------------------------------------------------
+
 /// Something that can move around, e.g. rabbits and wolves.
 pub trait Moveable {
     fn random_move<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<Point>;
-
     fn move_towards(&self, world: &World, loc: Point, dst: Point) -> Option<Point>;
 }
 register_type!(Moveable);

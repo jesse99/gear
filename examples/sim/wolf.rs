@@ -9,9 +9,7 @@ const REPRO_HUNGER: i32 = 200;
 const EAT_DELTA: i32 = -50;
 const BASAL_DELTA: i32 = 5;
 
-pub struct Wolf {
-    hunger: i32, // [0, MAX_HUNGER)
-}
+pub struct Wolf {}
 register_type!(Wolf);
 
 pub fn add_wolf(world: &mut World, store: &Store, loc: Point) -> ComponentId {
@@ -24,33 +22,20 @@ pub fn add_wolf(world: &mut World, store: &Store, loc: Point) -> ComponentId {
         [Action, Animal, Predator, Render]
     );
     add_object!(component, Mover, Mover::new(), [Moveable]);
+    add_object!(
+        component,
+        Hungering,
+        Hungering::new(INITAL_HUNGER, MAX_HUNGER),
+        [Hunger]
+    );
     world.add(store, loc, component);
     id
 }
 
 impl Wolf {
     pub fn new() -> Wolf {
-        Wolf {
-            hunger: INITAL_HUNGER,
-        }
+        Wolf {}
     }
-
-    pub fn adjust_hunger(&mut self, delta: i32) {
-        if delta > 0 {
-            if self.hunger <= MAX_HUNGER - delta {
-                self.hunger += delta;
-            } else {
-                self.hunger = MAX_HUNGER;
-            }
-        } else {
-            if self.hunger >= -delta {
-                self.hunger += delta;
-            } else {
-                self.hunger = 0;
-            }
-        }
-    }
-
     fn find_prey<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<ComponentId> {
         context
             .world
@@ -84,13 +69,18 @@ impl Wolf {
 impl Action for Wolf {
     fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> LifeCycle {
         // If we're not hungry then reproduce.
-        if self.hunger <= REPRO_HUNGER {
-            self.hunger = INITAL_HUNGER;
+        let component = context.store.get(context.id);
+        let hunger = find_trait_mut!(component, Hunger).unwrap();
+        if hunger.get() <= REPRO_HUNGER {
+            hunger.set(INITAL_HUNGER);
             let new_id = add_wolf(context.world, context.store, context.loc);
             if context.world.verbose >= 1 {
                 println!(
                     "wolf{} at {} is reproduced new wolf{} (hunger is {})",
-                    context.id, context.loc, new_id, self.hunger
+                    context.id,
+                    context.loc,
+                    new_id,
+                    hunger.get()
                 );
             }
             return LifeCycle::Alive;
@@ -98,18 +88,20 @@ impl Action for Wolf {
 
         // if we're hungry and there is prey in the cell then eat it
         if let Some(prey_id) = self.find_prey(&context) {
-            self.adjust_hunger(EAT_DELTA);
+            hunger.adjust(EAT_DELTA);
             if context.world.verbose >= 1 {
                 println!(
                     "wolf{} at {} is eating a rabbit (hunger is {})",
-                    context.id, context.loc, self.hunger
+                    context.id,
+                    context.loc,
+                    hunger.get()
                 );
             }
             context.world.remove(context.store, prey_id, context.loc);
             return LifeCycle::Alive;
         } else {
-            self.adjust_hunger(BASAL_DELTA);
-            if self.hunger == MAX_HUNGER {
+            hunger.adjust(BASAL_DELTA);
+            if hunger.get() == MAX_HUNGER {
                 if context.world.verbose >= 1 {
                     println!("wolf{} at {} has starved to death", context.id, context.loc);
                 }
@@ -119,14 +111,15 @@ impl Action for Wolf {
         }
 
         // move closer to prey
-        let component = context.store.get(context.id);
         let movable = find_trait!(component, Moveable).unwrap();
         if let Some(dst) = self.move_towards_prey(&context) {
             if let Some(new_loc) = movable.move_towards(context.world, context.loc, dst) {
                 if context.world.verbose >= 1 {
                     println!(
                         "wolf{} at {} is moving to {new_loc} towards {dst} (hunger is {})",
-                        context.id, context.loc, self.hunger
+                        context.id,
+                        context.loc,
+                        hunger.get()
                     );
                 }
                 context.world.move_to(context.id, context.loc, new_loc);
@@ -135,7 +128,9 @@ impl Action for Wolf {
                 if context.world.verbose >= 1 {
                     println!(
                         "wolf{} at {} can't move to {dst} (hunger is {})",
-                        context.id, context.loc, self.hunger
+                        context.id,
+                        context.loc,
+                        hunger.get()
                     );
                 }
             }
@@ -146,7 +141,9 @@ impl Action for Wolf {
             if context.world.verbose >= 1 {
                 println!(
                     "wolf{} at {} is doing random move to {new_loc} (hunger is {})",
-                    context.id, context.loc, self.hunger
+                    context.id,
+                    context.loc,
+                    hunger.get()
                 );
             }
             context.world.move_to(context.id, context.loc, new_loc);
@@ -157,7 +154,9 @@ impl Action for Wolf {
         if context.world.verbose >= 1 {
             println!(
                 "rabbit{} at {} did nothing (hunger is {})",
-                context.id, context.loc, self.hunger
+                context.id,
+                context.loc,
+                hunger.get()
             );
         }
         LifeCycle::Alive

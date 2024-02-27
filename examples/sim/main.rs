@@ -12,6 +12,7 @@ use rand::Rng;
 use rand::{RngCore, SeedableRng};
 
 mod grass;
+mod hungering;
 mod mover;
 mod point;
 mod rabbit;
@@ -22,6 +23,7 @@ mod wolf;
 mod world;
 
 use grass::*;
+use hungering::*;
 use mover::*;
 use point::*;
 use rabbit::*;
@@ -79,13 +81,6 @@ fn add_grass_patch(world: &mut World, store: &Store, center: Point, radius: i32)
 }
 
 // TODO:
-// rabbits should eat grass (will need to fixup step if grass is all eaten up)
-// rabbits should starve (leave a skeleton behind for a bit? kind of interferes tho)
-// rabbits should reproduce
-// add wolves
-// wolves should eat rabbits
-// wolves should starve (leave a skeleton behind for a bit?)
-// wolves should reproduce
 // use termion? or just use command line options to configure?
 //    seed, width/height, maybe debug (prints extra state)
 //    grass patch params?
