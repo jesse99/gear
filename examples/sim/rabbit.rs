@@ -13,10 +13,12 @@ pub struct Rabbit {
 }
 register_type!(Rabbit);
 
-pub fn add_rabbit(world: &mut World, store: &Store, loc: Point) {
+pub fn add_rabbit(world: &mut World, store: &Store, loc: Point) -> ComponentId {
     let mut component = Component::new();
+    let id = component.id;
     add_object!(component, Rabbit, Rabbit::new(), [Action, Animal, Render]);
     world.add(store, loc, component);
+    id
 }
 
 impl Rabbit {
@@ -144,35 +146,46 @@ impl Action for Rabbit {
         // if hunger is low then reproduce
         //    both rabbits should be hungry afterwards
 
+        // If we're not hungry at all then reproduce.
+        if self.hunger == 0 {
+            self.hunger = MAX_HUNGER / 2;
+            let new_id = add_rabbit(context.world, context.store, context.loc);
+            if context.world.verbose >= 1 {
+                println!(
+                    "rabbit{} at {} is reproduced new rabbit{} (hunger is {})",
+                    context.id, context.loc, new_id, self.hunger
+                );
+            }
+            return true;
+        }
+
         // if we're hungry and there is grass in the cell then eat it
-        if self.hunger > 0 {
-            if let Some(grass_id) = self.find_grass(&context) {
-                self.adjust_hunger(-HUNGER_DELTA);
+        if let Some(grass_id) = self.find_grass(&context) {
+            self.adjust_hunger(-HUNGER_DELTA);
+            if context.world.verbose >= 1 {
+                print!(
+                    "rabbit{} at {} is eating grass (hunger is {})",
+                    context.id, context.loc, self.hunger
+                );
+            }
+            let new_context = Context {
+                id: grass_id,
+                ..context
+            };
+            let component = context.store.get(grass_id);
+            let fodder = find_trait_mut!(component, Fodder).unwrap();
+            fodder.eat(new_context, 25);
+            return true;
+        } else {
+            self.adjust_hunger(HUNGER_DELTA);
+            if self.hunger == MAX_HUNGER {
                 if context.world.verbose >= 1 {
-                    print!(
-                        "rabbit{} at {} is eating grass (hunger is {})",
-                        context.id, context.loc, self.hunger
+                    println!(
+                        "rabbit{} at {} has starved to death",
+                        context.id, context.loc
                     );
                 }
-                let new_context = Context {
-                    id: grass_id,
-                    ..context
-                };
-                let component = context.store.get(grass_id);
-                let fodder = find_trait_mut!(component, Fodder).unwrap();
-                fodder.eat(new_context, 25);
-                return true;
-            } else {
-                self.adjust_hunger(HUNGER_DELTA);
-                if self.hunger == MAX_HUNGER {
-                    if context.world.verbose >= 1 {
-                        println!(
-                            "rabbit{} at {} has starved to death",
-                            context.id, context.loc
-                        );
-                    }
-                    return false;
-                }
+                return false;
             }
         }
 
