@@ -5,8 +5,11 @@ use super::*;
 
 const VISION_RADIUS: i32 = 4; // rabbits don't have great vision
 
-const MAX_HUNGER: i32 = 100;
-const HUNGER_DELTA: i32 = 10;
+const MAX_HUNGER: i32 = 300;
+const INITAL_HUNGER: i32 = 180;
+const REPRO_HUNGER: i32 = 90;
+const EAT_DELTA: i32 = -30;
+const BASAL_DELTA: i32 = 5;
 
 pub struct Rabbit {
     hunger: i32, // [0, MAX_HUNGER)
@@ -24,7 +27,7 @@ pub fn add_rabbit(world: &mut World, store: &Store, loc: Point) -> ComponentId {
 impl Rabbit {
     pub fn new() -> Rabbit {
         Rabbit {
-            hunger: MAX_HUNGER / 2,
+            hunger: INITAL_HUNGER,
         }
     }
 
@@ -147,8 +150,8 @@ impl Action for Rabbit {
         //    both rabbits should be hungry afterwards
 
         // If we're not hungry at all then reproduce.
-        if self.hunger == 0 {
-            self.hunger = MAX_HUNGER / 2;
+        if self.hunger <= REPRO_HUNGER {
+            self.hunger = INITAL_HUNGER;
             let new_id = add_rabbit(context.world, context.store, context.loc);
             if context.world.verbose >= 1 {
                 println!(
@@ -161,7 +164,7 @@ impl Action for Rabbit {
 
         // if we're hungry and there is grass in the cell then eat it
         if let Some(grass_id) = self.find_grass(&context) {
-            self.adjust_hunger(-HUNGER_DELTA);
+            self.adjust_hunger(EAT_DELTA);
             if context.world.verbose >= 1 {
                 print!(
                     "rabbit{} at {} is eating grass (hunger is {})",
@@ -177,7 +180,7 @@ impl Action for Rabbit {
             fodder.eat(new_context, 25);
             return true;
         } else {
-            self.adjust_hunger(HUNGER_DELTA);
+            self.adjust_hunger(BASAL_DELTA);
             if self.hunger == MAX_HUNGER {
                 if context.world.verbose >= 1 {
                     println!(

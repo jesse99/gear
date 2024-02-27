@@ -1,7 +1,9 @@
 //! Terrain type that grows to cover the world but may also be eaten by rabbits.
 use super::*;
 
-const GRASS_DELTA: u8 = 8;
+const GRASS_DELTA: u8 = 3;
+const INITIAL_HEIGHT: u8 = 48;
+const SPREAD_HEIGHT: u8 = 48;
 
 pub struct Grass {
     height: u8,
@@ -13,7 +15,7 @@ pub fn add_grass(world: &mut World, store: &Store, loc: Point) {
     add_object!(
         component,
         Grass,
-        Grass::new(16 * GRASS_DELTA),
+        Grass::new(INITIAL_HEIGHT),
         [Action, Render, Fodder]
     );
     world.add(store, loc, component);
@@ -69,7 +71,7 @@ impl Action for Grass {
         }
 
         // Once grass has grown enough it starts spreading.
-        if self.height > 2 * GRASS_DELTA {
+        if self.height > SPREAD_HEIGHT {
             for neighbor in context.world.all(context.loc, 1, |pt| {
                 context
                     .world
@@ -96,14 +98,10 @@ impl Action for Grass {
 impl Render for Grass {
     fn render(&self) -> char {
         assert!(self.height > 0);
-
-        // can't use match with math
-        if self.height <= 2 * GRASS_DELTA {
+        if self.height < SPREAD_HEIGHT {
             '~'
-        } else if self.height <= 4 * GRASS_DELTA {
-            '|'
         } else {
-            '!'
+            '|'
         }
     }
 }
