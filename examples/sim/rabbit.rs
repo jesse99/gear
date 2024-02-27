@@ -183,6 +183,7 @@ impl Action for Rabbit {
                         context.id, context.loc
                     );
                 }
+                add_skeleton(context.world, context.store, context.loc);
                 return LifeCycle::Dead;
             }
         }
