@@ -1,7 +1,7 @@
 use super::*;
 
 pub struct Hungers {
-    hunger: i32, // [0, max_hunger)
+    hunger: i32, // [0, max_hunger]
     max_hunger: i32,
 }
 register_type!(Hungers);
@@ -21,6 +21,8 @@ impl Hunger for Hungers {
     }
 
     fn set(&mut self, value: i32) {
+        assert!(value >= 0);
+        assert!(value <= self.max_hunger);
         self.hunger = value;
     }
 
@@ -38,5 +40,8 @@ impl Hunger for Hungers {
                 self.hunger = 0;
             }
         }
+
+        assert!(self.hunger >= 0);
+        assert!(self.hunger <= self.max_hunger);
     }
 }
