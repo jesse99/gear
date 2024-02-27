@@ -140,7 +140,7 @@ impl Rabbit {
 }
 
 impl Action for Rabbit {
-    fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> bool {
+    fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> LifeCycle {
         // if wolves are seen then attempt to move to a square furthest from the wolves
         //    (compare total distance to all the wolves with adjacent cells)
 
@@ -154,7 +154,7 @@ impl Action for Rabbit {
                     context.id, context.loc, new_id, self.hunger
                 );
             }
-            return true;
+            return LifeCycle::Alive;
         }
 
         // if we're hungry and there is grass in the cell then eat it
@@ -173,7 +173,7 @@ impl Action for Rabbit {
             let component = context.store.get(grass_id);
             let fodder = find_trait_mut!(component, Fodder).unwrap();
             fodder.eat(new_context, 25);
-            return true;
+            return LifeCycle::Alive;
         } else {
             self.adjust_hunger(BASAL_DELTA);
             if self.hunger == MAX_HUNGER {
@@ -183,7 +183,7 @@ impl Action for Rabbit {
                         context.id, context.loc
                     );
                 }
-                return false;
+                return LifeCycle::Dead;
             }
         }
 
@@ -197,7 +197,7 @@ impl Action for Rabbit {
                     );
                 }
                 context.world.move_to(context.id, context.loc, new_loc);
-                return true;
+                return LifeCycle::Alive;
             } else {
                 if context.world.verbose >= 1 {
                     println!(
@@ -217,7 +217,7 @@ impl Action for Rabbit {
                 );
             }
             context.world.move_to(context.id, context.loc, new_loc);
-            return true;
+            return LifeCycle::Alive;
         }
 
         // do nothing
@@ -227,7 +227,7 @@ impl Action for Rabbit {
                 context.id, context.loc, self.hunger
             );
         }
-        true // TODO: use an enum
+        LifeCycle::Alive
     }
 }
 

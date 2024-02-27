@@ -59,7 +59,7 @@ impl Fodder for Grass {
 }
 
 impl Action for Grass {
-    fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> bool {
+    fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> LifeCycle {
         let mut details = String::new();
 
         // Grass grows slowly.
@@ -91,7 +91,7 @@ impl Action for Grass {
         if !details.is_empty() {
             println!("grass at {} {}", context.loc, details);
         }
-        true
+        LifeCycle::Alive
     }
 }
 

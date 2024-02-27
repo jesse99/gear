@@ -130,8 +130,7 @@ impl World {
 
                 let component = store.get(id);
                 let action = find_trait_mut!(component, Action).unwrap();
-                let alive = action.act(context);
-                if !alive {
+                if action.act(context) == LifeCycle::Dead {
                     let ids = self.actors.get_mut(&loc).unwrap();
                     let index = ids.iter().position(|e| *e == id).unwrap();
                     ids.remove(index);

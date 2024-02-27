@@ -8,10 +8,16 @@ pub struct Context<'a, 'b> {
     pub id: ComponentId,
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum LifeCycle {
+    Alive,
+    Dead,
+}
+
 /// Every component should include this though it can be a no-op.
 pub trait Action {
     /// Returns true if the component is still alive.
-    fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> bool; // TODO: use an enum instead of a bool
+    fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> LifeCycle;
 }
 register_type!(Action);
 // ---------------------------------------------------------------------------------------
