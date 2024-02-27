@@ -1,21 +1,21 @@
 use super::*;
 
-pub struct Hungering {
+pub struct Hungers {
     hunger: i32, // [0, max_hunger)
     max_hunger: i32,
 }
-register_type!(Hungering);
+register_type!(Hungers);
 
-impl Hungering {
-    pub fn new(initial: i32, max: i32) -> Hungering {
-        Hungering {
+impl Hungers {
+    pub fn new(initial: i32, max: i32) -> Hungers {
+        Hungers {
             hunger: initial,
             max_hunger: max,
         }
     }
 }
 
-impl Hunger for Hungering {
+impl Hunger for Hungers {
     fn get(&self) -> i32 {
         self.hunger
     }

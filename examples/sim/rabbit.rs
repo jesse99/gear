@@ -24,8 +24,8 @@ pub fn add_rabbit(world: &mut World, store: &Store, loc: Point) -> ComponentId {
     add_object!(component, Mover, Mover::new(), [Moveable]);
     add_object!(
         component,
-        Hungering,
-        Hungering::new(INITAL_HUNGER, MAX_HUNGER),
+        Hungers,
+        Hungers::new(INITAL_HUNGER, MAX_HUNGER),
         [Hunger]
     );
     world.add(store, loc, component);

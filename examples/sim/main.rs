@@ -12,7 +12,7 @@ use rand::Rng;
 use rand::{RngCore, SeedableRng};
 
 mod grass;
-mod hungering;
+mod hungers;
 mod mover;
 mod point;
 mod rabbit;
@@ -23,7 +23,7 @@ mod wolf;
 mod world;
 
 use grass::*;
-use hungering::*;
+use hungers::*;
 use mover::*;
 use point::*;
 use rabbit::*;
@@ -44,7 +44,7 @@ struct Args {
     #[clap(long, value_name = "COUNT", default_value_t = 8)]
     rabbits: i32,
 
-    /// Random number seed (defaults to random)
+    /// Random number seed [default: random]
     #[clap(long, value_name = "NUM")]
     seed: Option<u64>,
 
