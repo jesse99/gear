@@ -40,6 +40,16 @@ pub trait Fodder {
 register_type!(Fodder);
 // ---------------------------------------------------------------------------------------
 
+/// Something predators can eat.
+pub trait Prey {}
+register_type!(Prey);
+// ---------------------------------------------------------------------------------------
+
+/// Something that eats prey.
+pub trait Predator {}
+register_type!(Predator);
+// ---------------------------------------------------------------------------------------
+
 /// Used to identify rabbits and wolves.
 pub trait Animal {}
 register_type!(Animal);

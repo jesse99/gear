@@ -1,4 +1,6 @@
 //! Animal that eats grass and is eaten by wolves.
+use std::str::CharIndices;
+
 use rand::seq::IteratorRandom;
 
 use super::*;
@@ -19,7 +21,12 @@ register_type!(Rabbit);
 pub fn add_rabbit(world: &mut World, store: &Store, loc: Point) -> ComponentId {
     let mut component = Component::new();
     let id = component.id;
-    add_object!(component, Rabbit, Rabbit::new(), [Action, Animal, Render]);
+    add_object!(
+        component,
+        Rabbit,
+        Rabbit::new(),
+        [Action, Animal, Prey, Render]
+    );
     world.add(store, loc, component);
     id
 }
@@ -54,6 +61,39 @@ impl Rabbit {
             .iter()
             .copied()
             .find(|id| has_trait!(context.store.get(*id), Fodder))
+    }
+
+    fn move_away_from_wolf<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<Point> {
+        let mut dst = None;
+        let mut dist = 0; // want to maximize distance from all visible wolves
+
+        let wolves = context.world.all(context.loc, VISION_RADIUS, |pt| {
+            context
+                .world
+                .cell(pt)
+                .iter()
+                .any(|id| has_trait!(context.store.get(*id), Predator))
+        });
+
+        for dy in -1..=1 {
+            for dx in -1..=1 {
+                let candidate = Point::new(context.loc.x + dx, context.loc.y + dy);
+                if candidate != context.loc
+                    && candidate.x >= 0
+                    && candidate.y >= 0
+                    && candidate.x < context.world.width
+                    && candidate.y < context.world.height
+                {
+                    let d = wolves.iter().map(|pt| pt.distance2(candidate)).sum();
+                    if d > dist {
+                        dst = Some(candidate);
+                        dist = d;
+                    }
+                }
+            }
+        }
+
+        dst
     }
 
     fn move_towards_grass<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<Point> {
@@ -141,8 +181,21 @@ impl Rabbit {
 
 impl Action for Rabbit {
     fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> LifeCycle {
-        // if wolves are seen then attempt to move to a square furthest from the wolves
-        //    (compare total distance to all the wolves with adjacent cells)
+        // If there are visible wolves then move as far as possible from them.
+        if let Some(new_loc) = self.move_away_from_wolf(&context) {
+            // It's hard for wolves to catch rabbits when they flee so occasionally
+            // we'll consider the rabbits too distracted to see wolves.
+            if context.world.rng().gen_bool(0.7) {
+                if context.world.verbose >= 1 {
+                    println!(
+                        "rabbit{} at {} is moving away from wolves to {new_loc} (hunger is {})",
+                        context.id, context.loc, self.hunger
+                    );
+                }
+                context.world.move_to(context.id, context.loc, new_loc);
+                return LifeCycle::Alive;
+            }
+        }
 
         // If we're not hungry then reproduce.
         if self.hunger <= REPRO_HUNGER {
@@ -239,3 +292,4 @@ impl Render for Rabbit {
 }
 
 impl Animal for Rabbit {}
+impl Prey for Rabbit {}

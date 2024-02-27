@@ -51,6 +51,11 @@ impl World {
     }
 
     pub fn move_to(&mut self, id: ComponentId, old_loc: Point, new_loc: Point) {
+        assert!(new_loc.x >= 0);
+        assert!(new_loc.y >= 0);
+        assert!(new_loc.x < self.width);
+        assert!(new_loc.y < self.height);
+
         let old_ids = self.actors.get_mut(&old_loc).unwrap();
         let index = old_ids.iter().position(|e| *e == id).unwrap();
         old_ids.remove(index);

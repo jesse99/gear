@@ -17,6 +17,7 @@ mod rabbit;
 mod skeleton;
 mod store;
 mod traits;
+mod wolf;
 mod world;
 
 use grass::*;
@@ -25,6 +26,7 @@ use rabbit::*;
 use skeleton::*;
 use store::*;
 use traits::*;
+use wolf::*;
 use world::*;
 
 #[derive(Parser, Debug)]
@@ -49,6 +51,10 @@ struct Args {
     /// Print extra information (up to -vvv)
     #[clap(short, long, action = clap::ArgAction::Count)]
     verbose: u8,
+
+    /// Number of wolves to start with
+    #[clap(long, value_name = "COUNT", default_value_t = 8)]
+    wolves: i32,
 }
 
 fn add_grass_patch(world: &mut World, store: &Store, center: Point, radius: i32) {
@@ -106,6 +112,14 @@ fn main() {
             rng.gen_range(0..world.height),
         );
         add_rabbit(&mut world, &store, loc);
+    }
+
+    for _ in 0..options.wolves {
+        let loc = Point::new(
+            rng.gen_range(0..world.width),
+            rng.gen_range(0..world.height),
+        );
+        add_wolf(&mut world, &store, loc);
     }
 
     store.sync();
