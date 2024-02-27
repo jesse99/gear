@@ -29,6 +29,15 @@ pub trait Render {
 register_type!(Render);
 // ---------------------------------------------------------------------------------------
 
+/// Something that can move around, e.g. rabbits and wolves.
+pub trait Moveable {
+    fn random_move<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<Point>;
+
+    fn move_towards(&self, world: &World, loc: Point, dst: Point) -> Option<Point>;
+}
+register_type!(Moveable);
+// ---------------------------------------------------------------------------------------
+
 /// Something rabbits can eat.
 pub trait Fodder {
     /// Percent is how much of the fodder rabbits eat at a time.

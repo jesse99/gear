@@ -12,6 +12,7 @@ use rand::Rng;
 use rand::{RngCore, SeedableRng};
 
 mod grass;
+mod mover;
 mod point;
 mod rabbit;
 mod skeleton;
@@ -21,6 +22,7 @@ mod wolf;
 mod world;
 
 use grass::*;
+use mover::*;
 use point::*;
 use rabbit::*;
 use skeleton::*;

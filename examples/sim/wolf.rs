@@ -1,6 +1,4 @@
 //! Animal that eats grass and is eaten by wolves.
-use rand::seq::IteratorRandom;
-
 use super::*;
 
 const VISION_RADIUS: i32 = 8; // wolves see quite a bit better than rabbits
@@ -25,6 +23,7 @@ pub fn add_wolf(world: &mut World, store: &Store, loc: Point) -> ComponentId {
         Wolf::new(),
         [Action, Animal, Predator, Render]
     );
+    add_object!(component, Mover, Mover::new(), [Moveable]);
     world.add(store, loc, component);
     id
 }
@@ -80,54 +79,6 @@ impl Wolf {
         }
         dst
     }
-
-    fn random_move<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<Point> {
-        // First try to move to a cell without another wolf.
-        let neighbors = context.world.all(context.loc, 1, |pt| {
-            context
-                .world
-                .cell(pt)
-                .iter()
-                .all(|id| pt != context.loc && !has_trait!(context.store.get(*id), Animal))
-        });
-        let choice = neighbors
-            .iter()
-            .choose(context.world.rng().as_mut())
-            .copied();
-        if choice.is_some() {
-            return choice;
-        }
-
-        // Then try to move anywhere.
-        let neighbors = context.world.all(context.loc, 1, |pt| pt != context.loc);
-        neighbors
-            .iter()
-            .choose(context.world.rng().as_mut())
-            .copied()
-    }
-
-    fn move_towards(&self, world: &World, loc: Point, dst: Point) -> Option<Point> {
-        let mut new_loc = None;
-        let mut dist = i32::MAX;
-
-        for dy in -1..=1 {
-            let y = loc.y + dy;
-            if y >= 0 && y < world.height {
-                for dx in -1..=1 {
-                    let x = loc.x + dx;
-                    if x >= 0 && x < world.width {
-                        let candidate = Point::new(x, y);
-                        let d = candidate.distance2(dst);
-                        if d < dist {
-                            new_loc = Some(candidate);
-                            dist = d;
-                        }
-                    }
-                }
-            }
-        }
-        new_loc
-    }
 }
 
 impl Action for Wolf {
@@ -168,8 +119,10 @@ impl Action for Wolf {
         }
 
         // move closer to prey
+        let component = context.store.get(context.id);
+        let movable = find_trait!(component, Moveable).unwrap();
         if let Some(dst) = self.move_towards_prey(&context) {
-            if let Some(new_loc) = self.move_towards(context.world, context.loc, dst) {
+            if let Some(new_loc) = movable.move_towards(context.world, context.loc, dst) {
                 if context.world.verbose >= 1 {
                     println!(
                         "wolf{} at {} is moving to {new_loc} towards {dst} (hunger is {})",
@@ -189,7 +142,7 @@ impl Action for Wolf {
         }
 
         // random move
-        if let Some(new_loc) = self.random_move(&context) {
+        if let Some(new_loc) = movable.random_move(&context) {
             if context.world.verbose >= 1 {
                 println!(
                     "wolf{} at {} is doing random move to {new_loc} (hunger is {})",
