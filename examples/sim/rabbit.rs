@@ -139,17 +139,12 @@ impl Rabbit {
     }
 }
 
-// TODO: finish this up
 impl Action for Rabbit {
-    // TODO: might want to add some logging
     fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> bool {
         // if wolves are seen then attempt to move to a square furthest from the wolves
         //    (compare total distance to all the wolves with adjacent cells)
 
-        // if hunger is low then reproduce
-        //    both rabbits should be hungry afterwards
-
-        // If we're not hungry at all then reproduce.
+        // If we're not hungry then reproduce.
         if self.hunger <= REPRO_HUNGER {
             self.hunger = INITAL_HUNGER;
             let new_id = add_rabbit(context.world, context.store, context.loc);

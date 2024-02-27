@@ -1,4 +1,4 @@
-//! Terrain type that grows to cover the world but may also be eaten by rabbits.
+//! Fodder type that grows to cover the world but may also be eaten by rabbits.
 use super::*;
 
 const GRASS_DELTA: u8 = 3;

@@ -107,8 +107,9 @@ fn main() {
     }
 
     store.sync();
+    world.render(&store);
     for _ in 0..options.ticks {
-        world.render(&store);
         world.step(&mut store);
+        world.render(&store);
     }
 }

@@ -146,8 +146,18 @@ impl World {
 
     /// Render all cells to the terminal.
     pub fn render(&self, store: &Store) {
-        println!("{}  ticks: {}", "-".repeat(self.width as usize), self.ticks);
+        println!("ticks: {}", self.ticks);
+        if self.verbose >= 1 {
+            print!("  ");
+            for x in 0..self.width {
+                print!("{}", x % 10);
+            }
+            println!();
+        }
         for y in 0..self.height {
+            if self.verbose >= 1 {
+                print!("{} ", y % 10);
+            }
             for x in 0..self.width {
                 let loc = Point::new(x, y);
                 if let Some(id) = self.actors.get(&loc).map(|v| v.last()).flatten() {
@@ -161,5 +171,6 @@ impl World {
             println!();
         }
         println!();
+        println!("{}", "-".repeat(self.width as usize));
     }
 }
