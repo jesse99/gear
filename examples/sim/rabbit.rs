@@ -6,6 +6,7 @@ use super::*;
 const VISION_RADIUS: i32 = 4; // rabbits don't have great vision
 
 const MAX_HUNGER: i32 = 100;
+const HUNGER_DELTA: i32 = 10;
 
 pub struct Rabbit {
     hunger: i32, // [0, MAX_HUNGER)
@@ -22,6 +23,22 @@ impl Rabbit {
     pub fn new() -> Rabbit {
         Rabbit {
             hunger: MAX_HUNGER / 2,
+        }
+    }
+
+    pub fn adjust_hunger(&mut self, delta: i32) {
+        if delta > 0 {
+            if self.hunger <= MAX_HUNGER - delta {
+                self.hunger += delta;
+            } else {
+                self.hunger = MAX_HUNGER;
+            }
+        } else {
+            if self.hunger >= -delta {
+                self.hunger += delta;
+            } else {
+                self.hunger = 0;
+            }
         }
     }
 
@@ -121,38 +138,51 @@ impl Rabbit {
 impl Action for Rabbit {
     // TODO: might want to add some logging
     fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> bool {
-        // if hunger is maxed then die
-
         // if wolves are seen then attempt to move to a square furthest from the wolves
         //    (compare total distance to all the wolves with adjacent cells)
 
         // if hunger is low then reproduce
         //    both rabbits should be hungry afterwards
 
-        // if there is grass in the cell then eat it
-        if let Some(grass_id) = self.find_grass(&context) {
-            // TODO: eat the grass, if full don't eat: just bail
-            if context.world.verbose >= 1 {
-                print!("rabbit{} at {} is eating grass", context.id, context.loc);
+        // if we're hungry and there is grass in the cell then eat it
+        if self.hunger > 0 {
+            if let Some(grass_id) = self.find_grass(&context) {
+                self.adjust_hunger(-HUNGER_DELTA);
+                if context.world.verbose >= 1 {
+                    print!(
+                        "rabbit{} at {} is eating grass (hunger is {})",
+                        context.id, context.loc, self.hunger
+                    );
+                }
+                let new_context = Context {
+                    id: grass_id,
+                    ..context
+                };
+                let component = context.store.get(grass_id);
+                let fodder = find_trait_mut!(component, Fodder).unwrap();
+                fodder.eat(new_context, 25);
+                return true;
+            } else {
+                self.adjust_hunger(HUNGER_DELTA);
+                if self.hunger == MAX_HUNGER {
+                    if context.world.verbose >= 1 {
+                        println!(
+                            "rabbit{} at {} has starved to death",
+                            context.id, context.loc
+                        );
+                    }
+                    return false;
+                }
             }
-            let new_context = Context {
-                id: grass_id,
-                ..context
-            };
-            let component = context.store.get(grass_id);
-            let fodder = find_trait_mut!(component, Fodder).unwrap();
-            fodder.eat(new_context, 25);
-            return true;
         }
-        // TODO: otherwise get hungrier
 
         // move closer to grass
         if let Some(dst) = self.move_towards_grass(&context) {
             if let Some(new_loc) = self.move_towards(context.world, context.loc, dst) {
                 if context.world.verbose >= 1 {
                     println!(
-                        "rabbit{} at {} is moving to {new_loc} towards {dst}",
-                        context.id, context.loc
+                        "rabbit{} at {} is moving to {new_loc} towards {dst} (hunger is {})",
+                        context.id, context.loc, self.hunger
                     );
                 }
                 context.world.move_to(context.id, context.loc, new_loc);
@@ -160,8 +190,8 @@ impl Action for Rabbit {
             } else {
                 if context.world.verbose >= 1 {
                     println!(
-                        "rabbit{} at {} can't move to {dst}",
-                        context.id, context.loc
+                        "rabbit{} at {} can't move to {dst} (hunger is {})",
+                        context.id, context.loc, self.hunger
                     );
                 }
             }
@@ -171,8 +201,8 @@ impl Action for Rabbit {
         if let Some(new_loc) = self.random_move(&context) {
             if context.world.verbose >= 1 {
                 println!(
-                    "rabbit{} at {} is doing random move to {new_loc}",
-                    context.id, context.loc
+                    "rabbit{} at {} is doing random move to {new_loc} (hunger is {})",
+                    context.id, context.loc, self.hunger
                 );
             }
             context.world.move_to(context.id, context.loc, new_loc);
@@ -181,7 +211,10 @@ impl Action for Rabbit {
 
         // do nothing
         if context.world.verbose >= 1 {
-            println!("rabbit{} at {} did nothing", context.id, context.loc);
+            println!(
+                "rabbit{} at {} did nothing (hunger is {})",
+                context.id, context.loc, self.hunger
+            );
         }
         true // TODO: use an enum
     }
