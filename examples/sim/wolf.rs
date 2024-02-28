@@ -1,18 +1,22 @@
 //! Animal that eats grass and is eaten by wolves.
-use std::option;
-
 use super::*;
+use colored::*;
 use rand::seq::IteratorRandom;
 
 const VISION_RADIUS: i32 = 8; // wolves see quite a bit better than rabbits
 
-const MAX_HUNGER: i32 = 400;
-const INITAL_HUNGER: i32 = 300;
-const REPRO_HUNGER: i32 = 200;
-const EAT_DELTA: i32 = -50;
-const BASAL_DELTA: i32 = 5;
+const MAX_HUNGER: i32 = 200; // starves when hit this
+const INITAL_HUNGER: i32 = 120;
+const REPRO_HUNGER: i32 = 80;
+const EAT_DELTA: i32 = -20; // not sure what this should be
+const BASAL_DELTA: i32 = 2;
 
-pub struct Wolf {}
+const REPRO_AGE: i32 = 10;
+const MAX_AGE: i32 = 50;
+
+struct Wolf {
+    age: i32,
+}
 register_type!(Wolf);
 
 pub fn add_wolf(world: &mut World, store: &Store, loc: Point) -> ComponentId {
@@ -31,11 +35,11 @@ pub fn add_wolf(world: &mut World, store: &Store, loc: Point) -> ComponentId {
         Hungers::new(INITAL_HUNGER, MAX_HUNGER),
         [Hunger]
     );
-    world.add(store, loc, component);
+    world.add_back(store, loc, component);
     id
 }
 
-pub fn find_prey(world: &World, store: &Store, loc: Point) -> Option<ComponentId> {
+fn find_prey(world: &World, store: &Store, loc: Point) -> Option<ComponentId> {
     world
         .cell(loc)
         .iter()
@@ -43,7 +47,7 @@ pub fn find_prey(world: &World, store: &Store, loc: Point) -> Option<ComponentId
         .find(|id| has_trait!(store.get(*id), Prey))
 }
 
-pub fn find_prey_cell<'a, 'b>(context: &Context<'a, 'b>) -> Option<(Point, ComponentId)> {
+fn find_prey_cell<'a, 'b>(context: &Context<'a, 'b>) -> Option<(Point, ComponentId)> {
     let mut candidates = Vec::new();
     for dy in -1..=1 {
         for dx in -1..=1 {
@@ -68,7 +72,7 @@ pub fn find_prey_cell<'a, 'b>(context: &Context<'a, 'b>) -> Option<(Point, Compo
 
 impl Wolf {
     pub fn new() -> Wolf {
-        Wolf {}
+        Wolf { age: 0 }
     }
 
     fn move_towards_prey<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<Point> {
@@ -83,33 +87,55 @@ impl Wolf {
                 .any(|id| has_trait!(context.store.get(*id), Prey))
         }) {
             let candidate = neighbor.distance2(context.loc);
-            if candidate < dist {
+            if candidate < dist && candidate > 2 {
                 dst = Some(neighbor);
                 dist = candidate;
             }
         }
         dst
     }
+
+    fn log<'a, 'b>(&self, context: &Context<'a, 'b>, suffix: &str) {
+        if context.world.verbose >= 1 {
+            let component = context.store.get(context.id);
+            let hunger = find_trait_mut!(component, Hunger).unwrap();
+            println!(
+                "wolf{} loc: {} age: {} hunger: {} {}",
+                context.id,
+                context.loc,
+                self.age,
+                hunger.get(),
+                suffix
+            );
+        }
+    }
 }
 
 impl Action for Wolf {
     fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> LifeCycle {
+        self.age += 1;
+
+        // Wolves can die of old age.
+        if self.age >= MAX_AGE {
+            self.log(&context, "died of old age");
+            add_skeleton(context.world, context.store, context.loc);
+            return LifeCycle::Dead;
+        }
+
         // If we're not hungry then reproduce.
         let component = context.store.get(context.id);
         let hunger = find_trait_mut!(component, Hunger).unwrap();
-        if hunger.get() <= REPRO_HUNGER {
+        if hunger.get() <= REPRO_HUNGER
+            && self.age >= REPRO_AGE
+            && context.world.rng().gen_bool(0.5)
+        {
             if let Some(neighbor) = find_empty_cell(context.world, context.store, context.loc) {
                 hunger.set(INITAL_HUNGER);
                 let new_id = add_wolf(context.world, context.store, neighbor);
-                if context.world.verbose >= 1 {
-                    println!(
-                        "wolf{} at {} reproduced new wolf{} (hunger is {})",
-                        context.id,
-                        context.loc,
-                        new_id,
-                        hunger.get()
-                    );
-                }
+                self.log(
+                    &context,
+                    &format!("reproduced new wolf{new_id} at {neighbor}"),
+                );
                 return LifeCycle::Alive;
             }
         }
@@ -117,22 +143,13 @@ impl Action for Wolf {
         // if we're hungry and there is prey nearby then eat it
         if let Some((neighbor, prey_id)) = find_prey_cell(&context) {
             hunger.adjust(EAT_DELTA);
-            if context.world.verbose >= 1 {
-                println!(
-                    "wolf{} at {} is eating a rabbit (hunger is {})",
-                    context.id,
-                    context.loc,
-                    hunger.get()
-                );
-            }
             context.world.remove(context.store, prey_id, neighbor);
+            self.log(&context, &format!("ate rabbit{prey_id} at {neighbor}"));
             return LifeCycle::Alive;
         } else {
             hunger.adjust(BASAL_DELTA);
             if hunger.get() == MAX_HUNGER {
-                if context.world.verbose >= 1 {
-                    println!("wolf{} at {} has starved to death", context.id, context.loc);
-                }
+                self.log(&context, "starved to death");
                 add_skeleton(context.world, context.store, context.loc);
                 return LifeCycle::Dead;
             }
@@ -141,59 +158,40 @@ impl Action for Wolf {
         // move closer to prey
         let movable = find_trait!(component, Moveable).unwrap();
         if let Some(dst) = self.move_towards_prey(&context) {
-            if let Some(new_loc) = movable.move_towards(context.world, context.loc, dst) {
-                if context.world.verbose >= 1 {
-                    println!(
-                        "wolf{} at {} is moving to {new_loc} towards {dst} (hunger is {})",
-                        context.id,
-                        context.loc,
-                        hunger.get()
-                    );
-                }
+            if let Some(new_loc) =
+                movable.move_towards(context.world, context.store, context.loc, dst)
+            {
+                self.log(
+                    &context,
+                    &format!("moving to {new_loc} towards prey at {dst}"),
+                );
                 context.world.move_to(context.id, context.loc, new_loc);
                 return LifeCycle::Alive;
             } else {
-                if context.world.verbose >= 1 {
-                    println!(
-                        "wolf{} at {} can't move to {dst} (hunger is {})",
-                        context.id,
-                        context.loc,
-                        hunger.get()
-                    );
-                }
+                self.log(&context, &format!("failed to move towards {dst}"));
             }
         }
 
         // random move
         if let Some(new_loc) = movable.random_move(&context) {
-            if context.world.verbose >= 1 {
-                println!(
-                    "wolf{} at {} is doing random move to {new_loc} (hunger is {})",
-                    context.id,
-                    context.loc,
-                    hunger.get()
-                );
-            }
+            self.log(&context, &format!("random move to {new_loc}"));
             context.world.move_to(context.id, context.loc, new_loc);
             return LifeCycle::Alive;
         }
 
         // do nothing
-        if context.world.verbose >= 1 {
-            println!(
-                "rabbit{} at {} did nothing (hunger is {})",
-                context.id,
-                context.loc,
-                hunger.get()
-            );
-        }
+        self.log(&context, "is doing nothing");
         LifeCycle::Alive
     }
 }
 
 impl Render for Wolf {
-    fn render(&self) -> char {
-        'w' // TODO: maybe use 'W' if there is a rabbit in the cell
+    fn render(&self) -> ColoredString {
+        if self.age == 0 {
+            "w".green()
+        } else {
+            "w".normal()
+        }
     }
 }
 

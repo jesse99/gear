@@ -26,9 +26,9 @@ impl Moveable for Mover {
             .copied()
     }
 
-    fn move_towards(&self, world: &World, loc: Point, dst: Point) -> Option<Point> {
+    fn move_towards(&self, world: &World, store: &Store, loc: Point, dst: Point) -> Option<Point> {
         let mut new_loc = None;
-        let mut dist = i32::MAX;
+        let mut dist = loc.distance2(dst);
 
         for dy in -1..=1 {
             let y = loc.y + dy;
@@ -37,10 +37,12 @@ impl Moveable for Mover {
                     let x = loc.x + dx;
                     if x >= 0 && x < world.width {
                         let candidate = Point::new(x, y);
-                        let d = candidate.distance2(dst);
-                        if d < dist {
-                            new_loc = Some(candidate);
-                            dist = d;
+                        if !has_animal(world, store, candidate) {
+                            let d = candidate.distance2(dst);
+                            if d < dist {
+                                new_loc = Some(candidate);
+                                dist = d;
+                            }
                         }
                     }
                 }

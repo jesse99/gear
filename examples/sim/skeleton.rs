@@ -1,9 +1,10 @@
 //! Left behind for a bit after an animal dies.
 use super::*;
+use colored::*;
 
 const MAX_LIFETIME: i32 = 4;
 
-pub struct Skeleton {
+struct Skeleton {
     lifetime: i32,
 }
 register_type!(Skeleton);
@@ -11,7 +12,7 @@ register_type!(Skeleton);
 pub fn add_skeleton(world: &mut World, store: &Store, loc: Point) {
     let mut component = Component::new();
     add_object!(component, Skeleton, Skeleton::new(), [Action, Render]);
-    world.add(store, loc, component);
+    world.add_back(store, loc, component);
 }
 
 impl Skeleton {
@@ -35,7 +36,11 @@ impl Action for Skeleton {
 }
 
 impl Render for Skeleton {
-    fn render(&self) -> char {
-        '*'
+    fn render(&self) -> ColoredString {
+        if self.lifetime == MAX_LIFETIME {
+            "*".red()
+        } else {
+            "*".normal()
+        }
     }
 }

@@ -1,11 +1,12 @@
 //! Fodder type that grows to cover the world but may also be eaten by rabbits.
 use super::*;
+use colored::*;
 
-const GRASS_DELTA: u8 = 3;
+const GRASS_DELTA: u8 = 4;
 const INITIAL_HEIGHT: u8 = 48;
 const SPREAD_HEIGHT: u8 = 48;
 
-pub struct Grass {
+struct Grass {
     height: u8,
 }
 register_type!(Grass);
@@ -18,13 +19,13 @@ pub fn add_grass(world: &mut World, store: &Store, loc: Point) {
         Grass::new(INITIAL_HEIGHT),
         [Action, Render, Fodder]
     );
-    world.add(store, loc, component);
+    world.add_front(store, loc, component);
 }
 
 pub fn spread_grass(world: &mut World, store: &Store, loc: Point) {
     let mut component = Component::new();
     add_object!(component, Grass, Grass::new(1), [Action, Render, Fodder]);
-    world.add(store, loc, component);
+    world.add_front(store, loc, component);
 }
 
 impl Grass {
@@ -41,15 +42,15 @@ impl Fodder for Grass {
     fn eat<'a, 'b>(&mut self, context: Context<'a, 'b>, percent: i32) {
         let delta = (percent * 255 / 100) as u8;
         if self.height <= delta {
-            if context.world.verbose >= 1 {
-                println!(", grass is now gone",);
+            if context.world.verbose >= 2 {
+                println!("   grass is now gone");
             }
             context.world.remove(context.store, context.id, context.loc);
         } else {
             self.height -= delta;
-            if context.world.verbose >= 1 {
+            if context.world.verbose >= 2 {
                 println!(
-                    ", grass went from height {} to {}",
+                    "   grass went from height {} to {}",
                     self.height + delta,
                     self.height
                 );
@@ -96,12 +97,12 @@ impl Action for Grass {
 }
 
 impl Render for Grass {
-    fn render(&self) -> char {
+    fn render(&self) -> ColoredString {
         assert!(self.height > 0);
         if self.height < SPREAD_HEIGHT {
-            '~'
+            "~".normal()
         } else {
-            '|'
+            "|".normal()
         }
     }
 }

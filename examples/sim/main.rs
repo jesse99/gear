@@ -37,11 +37,11 @@ use world::*;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// Number of grass patchs to start with
-    #[clap(long, value_name = "COUNT", default_value_t = 4)]
+    #[clap(long, value_name = "COUNT", default_value_t = 20)]
     grass: i32,
 
     /// Number of rabbits to start with
-    #[clap(long, value_name = "COUNT", default_value_t = 8)]
+    #[clap(long, value_name = "COUNT", default_value_t = 9)]
     rabbits: i32,
 
     /// Random number seed [default: random]
@@ -57,7 +57,7 @@ struct Args {
     verbose: u8,
 
     /// Number of wolves to start with
-    #[clap(long, value_name = "COUNT", default_value_t = 8)]
+    #[clap(long, value_name = "COUNT", default_value_t = 3)]
     wolves: i32,
 }
 
@@ -95,7 +95,7 @@ fn main() {
     let mut store = Store::new();
 
     for _ in 0..options.grass {
-        let radius: i32 = rng.gen_range(1..10);
+        let radius: i32 = rng.gen_range(1..20);
         let center = Point::new(
             rng.gen_range(0..world.width),
             rng.gen_range(0..world.height),

@@ -1,16 +1,22 @@
 //! Animal that eats grass and is eaten by wolves.
 use super::*;
+use colored::*;
 use rand::seq::IteratorRandom;
 
 const VISION_RADIUS: i32 = 4; // rabbits don't have great vision
 
-const MAX_HUNGER: i32 = 300;
-const INITAL_HUNGER: i32 = 180;
-const REPRO_HUNGER: i32 = 90;
-const EAT_DELTA: i32 = -30;
-const BASAL_DELTA: i32 = 5;
+const MAX_HUNGER: i32 = 45; // starves when hit this
+const INITAL_HUNGER: i32 = 25;
+const REPRO_HUNGER: i32 = 5;
+const EAT_DELTA: i32 = -9; // not sure what this should be
+const BASAL_DELTA: i32 = 3;
 
-pub struct Rabbit {}
+const REPRO_AGE: i32 = 10;
+const MAX_AGE: i32 = 25;
+
+struct Rabbit {
+    age: i32,
+}
 register_type!(Rabbit);
 
 pub fn add_rabbit(world: &mut World, store: &Store, loc: Point) -> ComponentId {
@@ -29,7 +35,7 @@ pub fn add_rabbit(world: &mut World, store: &Store, loc: Point) -> ComponentId {
         Hungers::new(INITAL_HUNGER, MAX_HUNGER),
         [Hunger]
     );
-    world.add(store, loc, component);
+    world.add_back(store, loc, component);
     id
 }
 
@@ -60,9 +66,36 @@ pub fn find_empty_cell(world: &World, store: &Store, loc: Point) -> Option<Point
     candidates.iter().copied().choose(world.rng().as_mut())
 }
 
+fn find_predator(world: &World, store: &Store, loc: Point) -> Option<ComponentId> {
+    world
+        .cell(loc)
+        .iter()
+        .copied()
+        .find(|id| has_trait!(store.get(*id), Predator))
+}
+
+fn predator_nearby<'a, 'b>(context: &Context<'a, 'b>) -> bool {
+    for dy in -1..=1 {
+        for dx in -1..=1 {
+            let candidate = Point::new(context.loc.x + dx, context.loc.y + dy);
+            if candidate != context.loc
+                && candidate.x >= 0
+                && candidate.y >= 0
+                && candidate.x < context.world.width
+                && candidate.y < context.world.height
+            {
+                if find_predator(context.world, context.store, candidate).is_some() {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 impl Rabbit {
     pub fn new() -> Rabbit {
-        Rabbit {}
+        Rabbit { age: 0 }
     }
 
     fn find_grass<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<ComponentId> {
@@ -144,59 +177,68 @@ impl Rabbit {
         }
         dst
     }
+
+    fn log<'a, 'b>(&self, context: &Context<'a, 'b>, suffix: &str) {
+        if context.world.verbose >= 1 {
+            let component = context.store.get(context.id);
+            let hunger = find_trait_mut!(component, Hunger).unwrap();
+            println!(
+                "rabbit{} loc: {} age: {} hunger: {} {}",
+                context.id,
+                context.loc,
+                self.age,
+                hunger.get(),
+                suffix
+            );
+        }
+    }
 }
 
 impl Action for Rabbit {
     fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> LifeCycle {
-        // If there are visible wolves then move as far as possible from them.
+        self.age += 1;
+
+        // Rabbits can die of old age.
+        if self.age >= MAX_AGE {
+            self.log(&context, "died of old age");
+            add_skeleton(context.world, context.store, context.loc);
+            return LifeCycle::Dead;
+        }
+
+        // If we're not hungry then reproduce.
         let component = context.store.get(context.id);
         let hunger = find_trait_mut!(component, Hunger).unwrap();
+        if hunger.get() <= REPRO_HUNGER
+            && self.age >= REPRO_AGE
+            && !predator_nearby(&context)
+            && context.world.rng().gen_bool(0.5)
+        {
+            if let Some(neighbor) = find_empty_cell(context.world, context.store, context.loc) {
+                hunger.set(INITAL_HUNGER);
+                let new_id = add_rabbit(context.world, context.store, neighbor);
+                self.log(
+                    &context,
+                    &format!("reproduced new rabbit{new_id} at {neighbor}"),
+                );
+                return LifeCycle::Alive;
+            }
+        }
+
+        // If there are visible wolves then move as far as possible from them.
         if let Some(new_loc) = self.move_away_from_wolf(&context) {
             // It's hard for wolves to catch rabbits when they flee so occasionally
             // we'll consider the rabbits too distracted to see wolves.
             if context.world.rng().gen_bool(0.7) {
-                if context.world.verbose >= 1 {
-                    println!(
-                        "rabbit{} at {} is moving away from wolves to {new_loc} (hunger is {})",
-                        context.id,
-                        context.loc,
-                        hunger.get()
-                    );
-                }
+                self.log(&context, &format!("moving away from wolves to {new_loc}"));
                 context.world.move_to(context.id, context.loc, new_loc);
                 return LifeCycle::Alive;
             }
         }
 
-        // If we're not hungry then reproduce.
-        if hunger.get() <= REPRO_HUNGER {
-            if let Some(neighbor) = find_empty_cell(context.world, context.store, context.loc) {
-                hunger.set(INITAL_HUNGER);
-                let new_id = add_rabbit(context.world, context.store, neighbor);
-                if context.world.verbose >= 1 {
-                    println!(
-                        "rabbit{} at {} reproduced new rabbit{} (hunger is {})",
-                        context.id,
-                        context.loc,
-                        new_id,
-                        hunger.get()
-                    );
-                }
-                return LifeCycle::Alive;
-            }
-        }
-
-        // if we're hungry and there is grass in the cell then eat it
+        // If we're hungry and there is grass in the cell then eat it.
         if let Some(grass_id) = self.find_grass(&context) {
             hunger.adjust(EAT_DELTA);
-            if context.world.verbose >= 1 {
-                print!(
-                    "rabbit{} at {} is eating grass (hunger is {})",
-                    context.id,
-                    context.loc,
-                    hunger.get()
-                );
-            }
+            self.log(&context, "ate grass");
             let new_context = Context {
                 id: grass_id,
                 ..context
@@ -208,12 +250,7 @@ impl Action for Rabbit {
         } else {
             hunger.adjust(BASAL_DELTA);
             if hunger.get() == MAX_HUNGER {
-                if context.world.verbose >= 1 {
-                    println!(
-                        "rabbit{} at {} has starved to death",
-                        context.id, context.loc
-                    );
-                }
+                self.log(&context, "starved to death");
                 add_skeleton(context.world, context.store, context.loc);
                 return LifeCycle::Dead;
             }
@@ -222,59 +259,40 @@ impl Action for Rabbit {
         // move closer to grass
         let movable = find_trait!(component, Moveable).unwrap();
         if let Some(dst) = self.move_towards_grass(&context) {
-            if let Some(new_loc) = movable.move_towards(context.world, context.loc, dst) {
-                if context.world.verbose >= 1 {
-                    println!(
-                        "rabbit{} at {} is moving to {new_loc} towards {dst} (hunger is {})",
-                        context.id,
-                        context.loc,
-                        hunger.get()
-                    );
-                }
+            if let Some(new_loc) =
+                movable.move_towards(context.world, context.store, context.loc, dst)
+            {
+                self.log(
+                    &context,
+                    &format!("moving to {new_loc} towards grass at {dst}"),
+                );
                 context.world.move_to(context.id, context.loc, new_loc);
                 return LifeCycle::Alive;
             } else {
-                if context.world.verbose >= 1 {
-                    println!(
-                        "rabbit{} at {} can't move to {dst} (hunger is {})",
-                        context.id,
-                        context.loc,
-                        hunger.get()
-                    );
-                }
+                self.log(&context, &format!("failed to move towards grass at {dst}"));
             }
         }
 
         // random move
         if let Some(new_loc) = movable.random_move(&context) {
-            if context.world.verbose >= 1 {
-                println!(
-                    "rabbit{} at {} is doing random move to {new_loc} (hunger is {})",
-                    context.id,
-                    context.loc,
-                    hunger.get()
-                );
-            }
+            self.log(&context, &format!("random move to {new_loc}"));
             context.world.move_to(context.id, context.loc, new_loc);
             return LifeCycle::Alive;
         }
 
         // do nothing
-        if context.world.verbose >= 1 {
-            println!(
-                "rabbit{} at {} did nothing (hunger is {})",
-                context.id,
-                context.loc,
-                hunger.get()
-            );
-        }
+        self.log(&context, "is doing nothing");
         LifeCycle::Alive
     }
 }
 
 impl Render for Rabbit {
-    fn render(&self) -> char {
-        'r' // TODO: maybe use 'R' if there is grass in the cell
+    fn render(&self) -> ColoredString {
+        if self.age == 0 {
+            "r".green()
+        } else {
+            "r".normal()
+        }
     }
 }
 

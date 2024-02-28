@@ -1,4 +1,5 @@
 use super::*;
+use colored::*;
 use rand::seq::SliceRandom;
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
@@ -37,7 +38,7 @@ impl World {
         &self.actors.get(&loc).unwrap_or(&self.dummy)
     }
 
-    pub fn add(&mut self, store: &Store, loc: Point, component: Component) {
+    pub fn add_back(&mut self, store: &Store, loc: Point, component: Component) {
         assert!(loc.x >= 0);
         assert!(loc.y >= 0);
         assert!(loc.x < self.width);
@@ -47,6 +48,19 @@ impl World {
 
         let actors = self.actors.entry(loc).or_default();
         actors.push(component.id);
+        store.add(component)
+    }
+
+    pub fn add_front(&mut self, store: &Store, loc: Point, component: Component) {
+        assert!(loc.x >= 0);
+        assert!(loc.y >= 0);
+        assert!(loc.x < self.width);
+        assert!(loc.y < self.height);
+        assert!(has_trait!(component, Action)); // required traits, objects may make use of others
+        assert!(has_trait!(component, Render));
+
+        let actors = self.actors.entry(loc).or_default();
+        actors.insert(0, component.id);
         store.add(component)
     }
 
@@ -168,7 +182,7 @@ impl World {
                     let component = store.get(*id);
                     let render = find_trait!(component, Render).unwrap();
                     let ch = render.render();
-                    if ch != '|' && ch != ' ' {
+                    if ch != "|".normal() && ch != " ".normal() {
                         cycle = LifeCycle::Alive;
                     }
                     print!("{}", ch);
