@@ -124,7 +124,6 @@ impl World {
 
         while !self.pending.is_empty() {
             let (loc, id) = self.pending.pop().unwrap();
-
             {
                 let context = Context {
                     world: self,
@@ -144,7 +143,6 @@ impl World {
             }
             store.sync();
         }
-
         self.ticks += 1;
     }
 

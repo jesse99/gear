@@ -1,5 +1,8 @@
 //! Animal that eats grass and is eaten by wolves.
+use std::option;
+
 use super::*;
+use rand::seq::IteratorRandom;
 
 const VISION_RADIUS: i32 = 8; // wolves see quite a bit better than rabbits
 
@@ -32,17 +35,40 @@ pub fn add_wolf(world: &mut World, store: &Store, loc: Point) -> ComponentId {
     id
 }
 
+pub fn find_prey(world: &World, store: &Store, loc: Point) -> Option<ComponentId> {
+    world
+        .cell(loc)
+        .iter()
+        .copied()
+        .find(|id| has_trait!(store.get(*id), Prey))
+}
+
+pub fn find_prey_cell<'a, 'b>(context: &Context<'a, 'b>) -> Option<(Point, ComponentId)> {
+    let mut candidates = Vec::new();
+    for dy in -1..=1 {
+        for dx in -1..=1 {
+            let candidate = Point::new(context.loc.x + dx, context.loc.y + dy);
+            if candidate != context.loc
+                && candidate.x >= 0
+                && candidate.y >= 0
+                && candidate.x < context.world.width
+                && candidate.y < context.world.height
+            {
+                if let Some(id) = find_prey(context.world, context.store, candidate) {
+                    candidates.push((candidate, id));
+                }
+            }
+        }
+    }
+    candidates
+        .iter()
+        .copied()
+        .choose(context.world.rng().as_mut())
+}
+
 impl Wolf {
     pub fn new() -> Wolf {
         Wolf {}
-    }
-    fn find_prey<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<ComponentId> {
-        context
-            .world
-            .cell(context.loc)
-            .iter()
-            .copied()
-            .find(|id| has_trait!(context.store.get(*id), Prey))
     }
 
     fn move_towards_prey<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<Point> {
@@ -72,22 +98,24 @@ impl Action for Wolf {
         let component = context.store.get(context.id);
         let hunger = find_trait_mut!(component, Hunger).unwrap();
         if hunger.get() <= REPRO_HUNGER {
-            hunger.set(INITAL_HUNGER);
-            let new_id = add_wolf(context.world, context.store, context.loc);
-            if context.world.verbose >= 1 {
-                println!(
-                    "wolf{} at {} is reproduced new wolf{} (hunger is {})",
-                    context.id,
-                    context.loc,
-                    new_id,
-                    hunger.get()
-                );
+            if let Some(neighbor) = find_empty_cell(context.world, context.store, context.loc) {
+                hunger.set(INITAL_HUNGER);
+                let new_id = add_wolf(context.world, context.store, neighbor);
+                if context.world.verbose >= 1 {
+                    println!(
+                        "wolf{} at {} reproduced new wolf{} (hunger is {})",
+                        context.id,
+                        context.loc,
+                        new_id,
+                        hunger.get()
+                    );
+                }
+                return LifeCycle::Alive;
             }
-            return LifeCycle::Alive;
         }
 
-        // if we're hungry and there is prey in the cell then eat it
-        if let Some(prey_id) = self.find_prey(&context) {
+        // if we're hungry and there is prey nearby then eat it
+        if let Some((neighbor, prey_id)) = find_prey_cell(&context) {
             hunger.adjust(EAT_DELTA);
             if context.world.verbose >= 1 {
                 println!(
@@ -97,7 +125,7 @@ impl Action for Wolf {
                     hunger.get()
                 );
             }
-            context.world.remove(context.store, prey_id, context.loc);
+            context.world.remove(context.store, prey_id, neighbor);
             return LifeCycle::Alive;
         } else {
             hunger.adjust(BASAL_DELTA);

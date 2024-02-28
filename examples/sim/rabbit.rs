@@ -1,5 +1,6 @@
 //! Animal that eats grass and is eaten by wolves.
 use super::*;
+use rand::seq::IteratorRandom;
 
 const VISION_RADIUS: i32 = 4; // rabbits don't have great vision
 
@@ -30,6 +31,33 @@ pub fn add_rabbit(world: &mut World, store: &Store, loc: Point) -> ComponentId {
     );
     world.add(store, loc, component);
     id
+}
+
+pub fn has_animal(world: &World, store: &Store, loc: Point) -> bool {
+    world
+        .cell(loc)
+        .iter()
+        .any(|id| has_trait!(store.get(*id), Animal))
+}
+
+pub fn find_empty_cell(world: &World, store: &Store, loc: Point) -> Option<Point> {
+    let mut candidates = Vec::new();
+    for dy in -1..=1 {
+        for dx in -1..=1 {
+            let candidate = Point::new(loc.x + dx, loc.y + dy);
+            if candidate != loc
+                && candidate.x >= 0
+                && candidate.y >= 0
+                && candidate.x < world.width
+                && candidate.y < world.height
+            {
+                if !has_animal(world, store, candidate) {
+                    candidates.push(candidate);
+                }
+            }
+        }
+    }
+    candidates.iter().copied().choose(world.rng().as_mut())
 }
 
 impl Rabbit {
@@ -67,10 +95,12 @@ impl Rabbit {
                     && candidate.x < context.world.width
                     && candidate.y < context.world.height
                 {
-                    let d = wolves.iter().map(|pt| pt.distance2(candidate)).sum();
-                    if d > dist {
-                        dst = Some(candidate);
-                        dist = d;
+                    if !has_animal(context.world, context.store, candidate) {
+                        let d = wolves.iter().map(|pt| pt.distance2(candidate)).sum();
+                        if d > dist {
+                            dst = Some(candidate);
+                            dist = d;
+                        }
                     }
                 }
             }
@@ -91,20 +121,22 @@ impl Rabbit {
                 .iter()
                 .any(|id| has_trait!(context.store.get(*id), Fodder))
         }) {
-            for id in context.world.cell(neighbor) {
-                let component = context.store.get(*id);
-                if let Some(fodder) = find_trait!(component, Fodder) {
-                    if fodder.height() > height {
-                        // move towards cells that have more grass
-                        dst = Some(neighbor);
-                        dist = neighbor.distance2(context.loc);
-                        height = fodder.height();
-                    } else if fodder.height() == height {
-                        // or to the closest cell for a particular height
-                        let candidate = neighbor.distance2(context.loc);
-                        if candidate < dist {
+            if !has_animal(context.world, context.store, neighbor) {
+                for id in context.world.cell(neighbor) {
+                    let component = context.store.get(*id);
+                    if let Some(fodder) = find_trait!(component, Fodder) {
+                        if fodder.height() > height {
+                            // move towards cells that have more grass
                             dst = Some(neighbor);
-                            dist = candidate;
+                            dist = neighbor.distance2(context.loc);
+                            height = fodder.height();
+                        } else if fodder.height() == height {
+                            // or to the closest cell for a particular height
+                            let candidate = neighbor.distance2(context.loc);
+                            if candidate < dist {
+                                dst = Some(neighbor);
+                                dist = candidate;
+                            }
                         }
                     }
                 }
@@ -138,18 +170,20 @@ impl Action for Rabbit {
 
         // If we're not hungry then reproduce.
         if hunger.get() <= REPRO_HUNGER {
-            hunger.set(INITAL_HUNGER);
-            let new_id = add_rabbit(context.world, context.store, context.loc);
-            if context.world.verbose >= 1 {
-                println!(
-                    "rabbit{} at {} is reproduced new rabbit{} (hunger is {})",
-                    context.id,
-                    context.loc,
-                    new_id,
-                    hunger.get()
-                );
+            if let Some(neighbor) = find_empty_cell(context.world, context.store, context.loc) {
+                hunger.set(INITAL_HUNGER);
+                let new_id = add_rabbit(context.world, context.store, neighbor);
+                if context.world.verbose >= 1 {
+                    println!(
+                        "rabbit{} at {} reproduced new rabbit{} (hunger is {})",
+                        context.id,
+                        context.loc,
+                        new_id,
+                        hunger.get()
+                    );
+                }
+                return LifeCycle::Alive;
             }
-            return LifeCycle::Alive;
         }
 
         // if we're hungry and there is grass in the cell then eat it

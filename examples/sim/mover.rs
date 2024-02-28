@@ -13,7 +13,6 @@ impl Mover {
 
 impl Moveable for Mover {
     fn random_move<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<Point> {
-        // First try to move to a cell without another wolf.
         let neighbors = context.world.all(context.loc, 1, |pt| {
             context
                 .world
@@ -21,16 +20,6 @@ impl Moveable for Mover {
                 .iter()
                 .all(|id| pt != context.loc && !has_trait!(context.store.get(*id), Animal))
         });
-        let choice = neighbors
-            .iter()
-            .choose(context.world.rng().as_mut())
-            .copied();
-        if choice.is_some() {
-            return choice;
-        }
-
-        // Then try to move anywhere.
-        let neighbors = context.world.all(context.loc, 1, |pt| pt != context.loc);
         neighbors
             .iter()
             .choose(context.world.rng().as_mut())
