@@ -31,6 +31,7 @@ impl Store {
         self.deathrow.borrow_mut().push(id);
     }
 
+    /// Called after each component has had a chance to execute.
     pub fn sync(&mut self) {
         for component in self.liverow.take() {
             let old = self.components.insert(component.id, component);

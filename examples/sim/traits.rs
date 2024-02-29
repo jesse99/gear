@@ -1,4 +1,5 @@
-//! Standard traits for components added to the world.
+//! Traits for components added to the world. These are the interfaces that the world
+//! uses to interact with components and how components interact with each other.
 use super::*;
 use colored::ColoredString;
 
@@ -18,7 +19,6 @@ pub enum LifeCycle {
 // ---------------------------------------------------------------------------------------
 /// Every component should include this though it can be a no-op.
 pub trait Action {
-    /// Returns true if the component is still alive.
     fn act<'a, 'b>(&mut self, context: Context<'a, 'b>) -> LifeCycle;
 }
 register_type!(Action);
@@ -31,7 +31,7 @@ pub trait Render {
 register_type!(Render);
 
 // ---------------------------------------------------------------------------------------
-/// Something that gets hungry.
+/// Helper interface for something that gets hungry.
 pub trait Hunger {
     fn get(&self) -> i32;
     fn set(&mut self, value: i32);
@@ -40,7 +40,7 @@ pub trait Hunger {
 register_type!(Hunger);
 
 // ---------------------------------------------------------------------------------------
-/// Something that can move around, e.g. rabbits and wolves.
+/// Helper interface for something that can move around, e.g. rabbits and wolves.
 pub trait Moveable {
     fn random_move<'a, 'b>(&self, context: &Context<'a, 'b>) -> Option<Point>;
     fn move_towards(&self, world: &World, store: &Store, loc: Point, dst: Point) -> Option<Point>;

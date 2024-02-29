@@ -4,7 +4,7 @@ use fnv::FnvHashMap;
 use rand::seq::SliceRandom;
 use std::cell::{RefCell, RefMut};
 
-// Handles all the global object state except for Component lifetimes.
+/// Handles all the global object state except for Component lifetimes.
 pub struct World {
     pub verbose: u8,
     width: i32,
@@ -34,12 +34,13 @@ impl World {
         self.rng.borrow_mut()
     }
 
-    /// Note that the world is a toroid so locations can be arbitrarily large.
+    /// Note that the world is a toroid so locations wrap around.
     pub fn cell(&self, loc: Point) -> &Vec<ComponentId> {
         let loc = self.wrap(loc);
         &self.actors.get(&loc).unwrap_or(&self.dummy)
     }
 
+    /// Use this for components that should always be rendered.
     pub fn add_back(&mut self, store: &Store, loc: Point, component: Component) {
         assert!(has_trait!(component, Action)); // required traits, objects may make use of others
         assert!(has_trait!(component, Render));
@@ -50,6 +51,7 @@ impl World {
         store.add(component)
     }
 
+    /// Use this for components that are rendered when they are the only component.
     pub fn add_front(&mut self, store: &Store, loc: Point, component: Component) {
         assert!(has_trait!(component, Action)); // required traits, objects may make use of others
         assert!(has_trait!(component, Render));
@@ -83,6 +85,7 @@ impl World {
             .iter()
             .position(|(pt, i)| *pt == loc && *i == id)
         {
+            // Don't act on components scheduled to be deleted.
             self.pending.remove(index);
         }
     }

@@ -8,7 +8,7 @@ const VISION_RADIUS: i32 = 8; // wolves see quite a bit better than rabbits
 const MAX_HUNGER: i32 = 200; // starves when hit this
 const INITAL_HUNGER: i32 = 120;
 const REPRO_HUNGER: i32 = 80;
-const EAT_DELTA: i32 = -20; // not sure what this should be
+const EAT_DELTA: i32 = -20;
 const BASAL_DELTA: i32 = 2;
 
 const REPRO_AGE: i32 = 10;

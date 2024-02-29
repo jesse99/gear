@@ -8,7 +8,7 @@ const VISION_RADIUS: i32 = 4; // rabbits don't have great vision
 const MAX_HUNGER: i32 = 45; // starves when hit this
 const INITAL_HUNGER: i32 = 25;
 const REPRO_HUNGER: i32 = 5;
-const EAT_DELTA: i32 = -9; // not sure what this should be
+const EAT_DELTA: i32 = -9;
 const BASAL_DELTA: i32 = 3;
 
 const REPRO_AGE: i32 = 10;
@@ -142,6 +142,9 @@ impl Rabbit {
                 .iter()
                 .any(|id| has_trait!(context.store.get(*id), Fodder))
         }) {
+            // If there are wolves around then we shouldn't land here.
+            // But if there are rabbits around then it's possible we'll be blocked from
+            // moving to the grass. But you could argue that rabbits are pretty dumb...
             if !has_animal(context.world, context.store, neighbor) {
                 for id in context.world.cell(neighbor) {
                     let component = context.store.get(*id);
@@ -212,10 +215,10 @@ impl Action for Rabbit {
             }
         }
 
-        // If there are visible wolves then move as far as possible from them.
+        // If there are visible wolves then move as far away as possible from them.
         if let Some(new_loc) = self.move_away_from_wolf(&context) {
-            // It's hard for wolves to catch rabbits when they flee so occasionally
-            // we'll consider the rabbits too distracted to see wolves.
+            // It's hard for wolves to catch rabbits when they always flee so
+            // occasionally we'll consider the rabbits too distracted to see wolves.
             if context.world.rng().gen_bool(0.8) {
                 self.log(&context, &format!("moving away from wolves to {new_loc}"));
                 context.world.move_to(context.id, context.loc, new_loc);
@@ -233,7 +236,7 @@ impl Action for Rabbit {
             };
             let component = context.store.get(grass_id);
             let fodder = find_trait_mut!(component, Fodder).unwrap();
-            fodder.eat(new_context, 25);
+            fodder.eat(new_context, 25); // grass may die here
             return LifeCycle::Alive;
         } else {
             hunger.adjust(BASAL_DELTA);

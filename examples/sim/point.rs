@@ -13,13 +13,6 @@ impl Point {
     pub fn new(x: i32, y: i32) -> Point {
         Point { x, y }
     }
-
-    /// distance squared between two points
-    pub fn distance2(&self, rhs: Point) -> i32 {
-        let dx = self.x - rhs.x;
-        let dy = self.y - rhs.y;
-        dx * dx + dy * dy
-    }
 }
 
 impl Ord for Point {
