@@ -36,7 +36,7 @@ use world::*;
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Number of grass patchs to start with
+    /// Number of grass patches to start with
     #[clap(long, value_name = "COUNT", default_value_t = 20)]
     grass: i32,
 
@@ -45,7 +45,7 @@ struct Args {
     legend: bool,
 
     /// Number of rabbits to start with
-    #[clap(long, value_name = "COUNT", default_value_t = 9)]
+    #[clap(long, value_name = "COUNT", default_value_t = 12)]
     rabbits: i32,
 
     /// Random number seed [default: random]
@@ -61,7 +61,7 @@ struct Args {
     verbose: u8,
 
     /// Number of wolves to start with
-    #[clap(long, value_name = "COUNT", default_value_t = 3)]
+    #[clap(long, value_name = "COUNT", default_value_t = 6)]
     wolves: i32,
 }
 
@@ -98,7 +98,7 @@ fn print_legend() {
 fn run_sim(options: Args) {
     let seed = options.seed.unwrap_or(Utc::now().timestamp_millis() as u64);
     let mut rng = StdRng::seed_from_u64(seed);
-    let mut world = World::new(20, 20, Box::new(rng.clone()), options.verbose);
+    let mut world = World::new(30, 20, Box::new(rng.clone()), options.verbose);
     let mut store = Store::new();
 
     for _ in 0..options.grass {

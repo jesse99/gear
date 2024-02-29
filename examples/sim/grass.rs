@@ -2,7 +2,7 @@
 use super::*;
 use colored::*;
 
-const GRASS_DELTA: u8 = 4;
+const GRASS_DELTA: u8 = 4; // amount by which grass grows each tick
 const INITIAL_HEIGHT: u8 = 48;
 const SPREAD_HEIGHT: u8 = 48;
 
