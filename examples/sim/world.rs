@@ -6,9 +6,9 @@ use std::cell::{RefCell, RefMut};
 
 // Handles all the global object state except for Component lifetimes.
 pub struct World {
-    pub width: i32,
-    pub height: i32,
     pub verbose: u8,
+    width: i32,
+    height: i32,
     rng: RefCell<Box<dyn RngCore>>,
     actors: FnvHashMap<Point, Vec<ComponentId>>,
     pending: Vec<(Point, ComponentId)>,
@@ -34,42 +34,35 @@ impl World {
         self.rng.borrow_mut()
     }
 
+    /// Note that the world is a toroid so locations can be arbitrarily large.
     pub fn cell(&self, loc: Point) -> &Vec<ComponentId> {
+        let loc = self.wrap(loc);
         &self.actors.get(&loc).unwrap_or(&self.dummy)
     }
 
     pub fn add_back(&mut self, store: &Store, loc: Point, component: Component) {
-        assert!(loc.x >= 0);
-        assert!(loc.y >= 0);
-        assert!(loc.x < self.width);
-        assert!(loc.y < self.height);
         assert!(has_trait!(component, Action)); // required traits, objects may make use of others
         assert!(has_trait!(component, Render));
 
+        let loc = self.wrap(loc);
         let actors = self.actors.entry(loc).or_default();
         actors.push(component.id);
         store.add(component)
     }
 
     pub fn add_front(&mut self, store: &Store, loc: Point, component: Component) {
-        assert!(loc.x >= 0);
-        assert!(loc.y >= 0);
-        assert!(loc.x < self.width);
-        assert!(loc.y < self.height);
         assert!(has_trait!(component, Action)); // required traits, objects may make use of others
         assert!(has_trait!(component, Render));
 
+        let loc = self.wrap(loc);
         let actors = self.actors.entry(loc).or_default();
         actors.insert(0, component.id);
         store.add(component)
     }
 
     pub fn move_to(&mut self, id: ComponentId, old_loc: Point, new_loc: Point) {
-        assert!(new_loc.x >= 0);
-        assert!(new_loc.y >= 0);
-        assert!(new_loc.x < self.width);
-        assert!(new_loc.y < self.height);
-
+        let old_loc = self.wrap(old_loc);
+        let new_loc = self.wrap(new_loc);
         let old_ids = self.actors.get_mut(&old_loc).unwrap();
         let index = old_ids.iter().position(|e| *e == id).unwrap();
         old_ids.remove(index);
@@ -79,6 +72,7 @@ impl World {
     }
 
     pub fn remove(&mut self, store: &Store, id: ComponentId, loc: Point) {
+        let loc = self.wrap(loc);
         let old_ids = self.actors.get_mut(&loc).unwrap();
         let index = old_ids.iter().position(|e| *e == id).unwrap();
         old_ids.remove(index);
@@ -99,17 +93,14 @@ impl World {
         P: Fn(Point) -> bool,
     {
         let mut cells = Vec::new();
+        let loc = self.wrap(loc);
         for dy in -radius..=radius {
             let y = loc.y + dy;
-            if y >= 0 && y < self.height {
-                for dx in -radius..=radius {
-                    let x = loc.x + dx;
-                    if x >= 0 && x < self.width {
-                        let candidate = Point::new(x, y);
-                        if predicate(candidate) {
-                            cells.push(candidate);
-                        }
-                    }
+            for dx in -radius..=radius {
+                let x = loc.x + dx;
+                let candidate = Point::new(x, y);
+                if predicate(candidate) {
+                    cells.push(candidate);
                 }
             }
         }
@@ -195,5 +186,41 @@ impl World {
         println!();
         println!("{}", "-".repeat(self.width as usize));
         cycle
+    }
+
+    /// Because the world is a toroid the distance between two locations has to take into
+    /// account the edges of the world.
+    pub fn distance2(&self, loc1: Point, loc2: Point) -> i32 {
+        let mut dx = i32::abs(loc1.x - loc2.x);
+        let mut dy = i32::abs(loc1.y - loc2.y);
+
+        if dx > self.width / 2 {
+            dx = self.width / 2 - dx;
+        }
+
+        if dy > self.height / 2 {
+            dy = self.height - dy;
+        }
+
+        dx * dx + dy * dy
+    }
+
+    fn wrap(&self, loc: Point) -> Point {
+        let mut x = loc.x;
+        let mut y = loc.y;
+
+        x = if x >= 0 {
+            x % self.width
+        } else {
+            x + self.width
+        };
+
+        y = if y >= 0 {
+            y % self.height
+        } else {
+            y + self.height
+        };
+
+        Point::new(x, y)
     }
 }

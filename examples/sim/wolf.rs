@@ -52,12 +52,7 @@ fn find_prey_cell<'a, 'b>(context: &Context<'a, 'b>) -> Option<(Point, Component
     for dy in -1..=1 {
         for dx in -1..=1 {
             let candidate = Point::new(context.loc.x + dx, context.loc.y + dy);
-            if candidate != context.loc
-                && candidate.x >= 0
-                && candidate.y >= 0
-                && candidate.x < context.world.width
-                && candidate.y < context.world.height
-            {
+            if candidate != context.loc {
                 if let Some(id) = find_prey(context.world, context.store, candidate) {
                     candidates.push((candidate, id));
                 }
@@ -86,7 +81,7 @@ impl Wolf {
                 .iter()
                 .any(|id| has_trait!(context.store.get(*id), Prey))
         }) {
-            let candidate = neighbor.distance2(context.loc);
+            let candidate = context.world.distance2(neighbor, context.loc);
             if candidate < dist && candidate > 2 {
                 dst = Some(neighbor);
                 dist = candidate;

@@ -61,23 +61,19 @@ struct Args {
     verbose: u8,
 
     /// Number of wolves to start with
-    #[clap(long, value_name = "COUNT", default_value_t = 6)]
+    #[clap(long, value_name = "COUNT", default_value_t = 3)]
     wolves: i32,
 }
 
 fn add_grass_patch(world: &mut World, store: &Store, center: Point, radius: i32) {
     for dy in -radius..=radius {
         let y = center.y + dy;
-        if y >= 0 && y < world.height {
-            for dx in -radius..=radius {
-                let x = center.x + dx;
-                if x >= 0 && x < world.width {
-                    let loc = Point::new(x, y);
-                    if center.distance2(loc) < radius {
-                        if world.cell(loc).is_empty() {
-                            add_grass(world, store, loc);
-                        }
-                    }
+        for dx in -radius..=radius {
+            let x = center.x + dx;
+            let loc = Point::new(x, y);
+            if world.distance2(center, loc) < radius {
+                if world.cell(loc).is_empty() {
+                    add_grass(world, store, loc);
                 }
             }
         }
@@ -96,33 +92,27 @@ fn print_legend() {
 }
 
 fn run_sim(options: Args) {
+    const WIDTH: i32 = 30;
+    const HEIGHT: i32 = 20;
+
     let seed = options.seed.unwrap_or(Utc::now().timestamp_millis() as u64);
     let mut rng = StdRng::seed_from_u64(seed);
-    let mut world = World::new(30, 20, Box::new(rng.clone()), options.verbose);
+    let mut world = World::new(WIDTH, HEIGHT, Box::new(rng.clone()), options.verbose);
     let mut store = Store::new();
 
     for _ in 0..options.grass {
         let radius: i32 = rng.gen_range(1..20);
-        let center = Point::new(
-            rng.gen_range(0..world.width),
-            rng.gen_range(0..world.height),
-        );
+        let center = Point::new(rng.gen_range(0..WIDTH), rng.gen_range(0..HEIGHT));
         add_grass_patch(&mut world, &store, center, radius);
     }
 
     for _ in 0..options.rabbits {
-        let loc = Point::new(
-            rng.gen_range(0..world.width),
-            rng.gen_range(0..world.height),
-        );
+        let loc = Point::new(rng.gen_range(0..WIDTH), rng.gen_range(0..HEIGHT));
         add_rabbit(&mut world, &store, loc);
     }
 
     for _ in 0..options.wolves {
-        let loc = Point::new(
-            rng.gen_range(0..world.width),
-            rng.gen_range(0..world.height),
-        );
+        let loc = Point::new(rng.gen_range(0..WIDTH), rng.gen_range(0..HEIGHT));
         add_wolf(&mut world, &store, loc);
     }
 

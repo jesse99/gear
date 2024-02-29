@@ -51,12 +51,7 @@ pub fn find_empty_cell(world: &World, store: &Store, loc: Point) -> Option<Point
     for dy in -1..=1 {
         for dx in -1..=1 {
             let candidate = Point::new(loc.x + dx, loc.y + dy);
-            if candidate != loc
-                && candidate.x >= 0
-                && candidate.y >= 0
-                && candidate.x < world.width
-                && candidate.y < world.height
-            {
+            if candidate != loc {
                 if !has_animal(world, store, candidate) {
                     candidates.push(candidate);
                 }
@@ -78,12 +73,7 @@ fn predator_nearby<'a, 'b>(context: &Context<'a, 'b>) -> bool {
     for dy in -1..=1 {
         for dx in -1..=1 {
             let candidate = Point::new(context.loc.x + dx, context.loc.y + dy);
-            if candidate != context.loc
-                && candidate.x >= 0
-                && candidate.y >= 0
-                && candidate.x < context.world.width
-                && candidate.y < context.world.height
-            {
+            if candidate != context.loc {
                 if find_predator(context.world, context.store, candidate).is_some() {
                     return true;
                 }
@@ -122,14 +112,12 @@ impl Rabbit {
         for dy in -1..=1 {
             for dx in -1..=1 {
                 let candidate = Point::new(context.loc.x + dx, context.loc.y + dy);
-                if candidate != context.loc
-                    && candidate.x >= 0
-                    && candidate.y >= 0
-                    && candidate.x < context.world.width
-                    && candidate.y < context.world.height
-                {
+                if candidate != context.loc {
                     if !has_animal(context.world, context.store, candidate) {
-                        let d = wolves.iter().map(|pt| pt.distance2(candidate)).sum();
+                        let d = wolves
+                            .iter()
+                            .map(|pt| context.world.distance2(*pt, candidate))
+                            .sum();
                         if d > dist {
                             dst = Some(candidate);
                             dist = d;
@@ -161,11 +149,11 @@ impl Rabbit {
                         if fodder.height() > height {
                             // move towards cells that have more grass
                             dst = Some(neighbor);
-                            dist = neighbor.distance2(context.loc);
+                            dist = context.world.distance2(neighbor, context.loc);
                             height = fodder.height();
                         } else if fodder.height() == height {
                             // or to the closest cell for a particular height
-                            let candidate = neighbor.distance2(context.loc);
+                            let candidate = context.world.distance2(neighbor, context.loc);
                             if candidate < dist {
                                 dst = Some(neighbor);
                                 dist = candidate;
@@ -228,7 +216,7 @@ impl Action for Rabbit {
         if let Some(new_loc) = self.move_away_from_wolf(&context) {
             // It's hard for wolves to catch rabbits when they flee so occasionally
             // we'll consider the rabbits too distracted to see wolves.
-            if context.world.rng().gen_bool(0.65) {
+            if context.world.rng().gen_bool(0.8) {
                 self.log(&context, &format!("moving away from wolves to {new_loc}"));
                 context.world.move_to(context.id, context.loc, new_loc);
                 return LifeCycle::Alive;
