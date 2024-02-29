@@ -228,7 +228,7 @@ impl Action for Rabbit {
         if let Some(new_loc) = self.move_away_from_wolf(&context) {
             // It's hard for wolves to catch rabbits when they flee so occasionally
             // we'll consider the rabbits too distracted to see wolves.
-            if context.world.rng().gen_bool(0.7) {
+            if context.world.rng().gen_bool(0.65) {
                 self.log(&context, &format!("moving away from wolves to {new_loc}"));
                 context.world.move_to(context.id, context.loc, new_loc);
                 return LifeCycle::Alive;
