@@ -40,6 +40,10 @@ struct Args {
     #[clap(long, value_name = "COUNT", default_value_t = 20)]
     grass: i32,
 
+    /// Describe map symbols and exit
+    #[clap(long)]
+    legend: bool,
+
     /// Number of rabbits to start with
     #[clap(long, value_name = "COUNT", default_value_t = 9)]
     rabbits: i32,
@@ -80,15 +84,18 @@ fn add_grass_patch(world: &mut World, store: &Store, center: Point, radius: i32)
     }
 }
 
-// TODO:
-// use termion? or just use command line options to configure?
-//    seed, width/height, maybe debug (prints extra state)
-//    grass patch params?
-// track stats over time?
-// add some sort of readme
-fn main() {
-    let options = Args::parse();
+fn print_legend() {
+    println!("~ is short grass");
+    println!("| is tall grass");
+    println!("r is a rabbit");
+    println!("w is a wolf");
+    println!("* is the skeleton of a rabbit or wolf");
+    println!();
+    println!("Newborn rabbits and wolves are green.");
+    println!("New skeletons are red.");
+}
 
+fn run_sim(options: Args) {
     let seed = options.seed.unwrap_or(Utc::now().timestamp_millis() as u64);
     let mut rng = StdRng::seed_from_u64(seed);
     let mut world = World::new(20, 20, Box::new(rng.clone()), options.verbose);
@@ -127,5 +134,14 @@ fn main() {
             println!("Stopping early: world has stabilized");
             break;
         }
+    }
+}
+
+fn main() {
+    let options = Args::parse();
+    if options.legend {
+        print_legend();
+    } else {
+        run_sim(options);
     }
 }
