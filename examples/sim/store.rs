@@ -1,11 +1,11 @@
 use super::*;
+use fnv::FnvHashMap;
 use std::cell::RefCell;
-use std::collections::HashMap;
 
 /// Manages [`Component`]` lifetimes. This is broken out from [`World`] to avoid borrow
 /// checker issues.
 pub struct Store {
-    components: HashMap<ComponentId, Component>,
+    components: FnvHashMap<ComponentId, Component>,
     liverow: RefCell<Vec<Component>>,
     deathrow: RefCell<Vec<ComponentId>>,
 }
@@ -13,7 +13,7 @@ pub struct Store {
 impl Store {
     pub fn new() -> Store {
         Store {
-            components: HashMap::new(),
+            components: FnvHashMap::default(),
             liverow: RefCell::new(Vec::new()),
             deathrow: RefCell::new(Vec::new()),
         }

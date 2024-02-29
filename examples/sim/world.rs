@@ -1,8 +1,8 @@
 use super::*;
 use colored::*;
+use fnv::FnvHashMap;
 use rand::seq::SliceRandom;
 use std::cell::{RefCell, RefMut};
-use std::collections::HashMap;
 
 // Handles all the global object state except for Component lifetimes.
 pub struct World {
@@ -10,7 +10,7 @@ pub struct World {
     pub height: i32,
     pub verbose: u8,
     rng: RefCell<Box<dyn RngCore>>,
-    actors: HashMap<Point, Vec<ComponentId>>,
+    actors: FnvHashMap<Point, Vec<ComponentId>>,
     pending: Vec<(Point, ComponentId)>,
     dummy: Vec<ComponentId>,
     ticks: i32, // incremented each time components get a chance to act
@@ -23,7 +23,7 @@ impl World {
             height,
             verbose,
             rng: RefCell::new(rng),
-            actors: HashMap::new(),
+            actors: FnvHashMap::default(),
             pending: Vec::new(),
             dummy: Vec::new(),
             ticks: 0,
