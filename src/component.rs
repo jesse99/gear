@@ -25,7 +25,7 @@ pub struct Component {
 }
 
 impl Component {
-    /// tag is used by Debug.
+    /// tag is used by the Debug trait on Component (and ComponentId).
     pub fn new(tag: &str) -> Component {
         Component {
             id: next_component_id(tag),
@@ -36,7 +36,8 @@ impl Component {
         }
     }
 
-    /// Normally the [`add_object`]` macro would be used instead of calling this directly.
+    // Normally the [`add_object`]` macro would be used instead of calling this directly.
+    #[doc(hidden)]
     pub fn add_trait<Trait, Object>(&mut self, trait_id: TypeId, obj_ptr: *mut Object)
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
@@ -47,7 +48,8 @@ impl Component {
         assert!(old.is_none(), "trait was already added to the component");
     }
 
-    /// Normally the [`add_object`]` macro would be used instead of calling this directly.
+    // Normally the [`add_object`]` macro would be used instead of calling this directly.
+    #[doc(hidden)]
     pub fn add_repeated_trait<Trait, Object>(&mut self, trait_id: TypeId, obj_ptr: *mut Object)
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
@@ -58,7 +60,8 @@ impl Component {
         pointers.push(erased);
     }
 
-    /// Normally the [`add_object`]` macro would be used instead of calling this directly.
+    // Normally the [`add_object`]` macro would be used instead of calling this directly.
+    #[doc(hidden)]
     pub fn add_object<Object>(&mut self, obj_id: TypeId, obj_ptr: *mut Object)
     where
         Object: 'static,
@@ -73,10 +76,11 @@ impl Component {
 
     // TODO: May want to support remove_object. Would be kinda slow: probably need to
     // change traits and repeated so that the value includes the object's type id. One
-    // nice thing is, that if we did do that, Debug and Display could attach traits to
-    // the corresponding object.
+    // nice thing is, that if we did do that, Debug and Display could print the traits
+    // associated with the corresponding object.
 
-    /// Normally the [`has_trait`]` macro would be used instead of calling this directly.
+    // Normally the [`has_trait`]` macro would be used instead of calling this directly.
+    #[doc(hidden)]
     pub fn has<Trait>(&self, trait_id: TypeId) -> bool
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
@@ -84,7 +88,8 @@ impl Component {
         self.traits.get(&trait_id).is_some()
     }
 
-    /// Normally the [`find_trait`]` macro would be used instead of calling this directly.
+    // Normally the [`find_trait`]` macro would be used instead of calling this directly.
+    #[doc(hidden)]
     pub fn find<Trait>(&self, trait_id: TypeId) -> Option<&Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
@@ -97,7 +102,8 @@ impl Component {
         }
     }
 
-    /// Normally the [`find_trait_mut`]` macro would be used instead of calling this directly.
+    // Normally the [`find_trait_mut`]` macro would be used instead of calling this directly.
+    #[doc(hidden)]
     pub fn find_mut<Trait>(&self, trait_id: TypeId) -> Option<&mut Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
@@ -110,7 +116,8 @@ impl Component {
         }
     }
 
-    /// Normally the [`find_repeated_trait`]` macro would be used instead of calling this directly.
+    // Normally the [`find_repeated_trait`]` macro would be used instead of calling this directly.
+    #[doc(hidden)]
     pub fn find_repeated<Trait>(&self, trait_id: TypeId) -> impl Iterator<Item = &Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
@@ -122,7 +129,8 @@ impl Component {
             .map(|e| unsafe { e.to_trait::<Trait>() })
     }
 
-    /// Normally the [`find_repeated_trait_mut`]` macro would be used instead of calling this directly.
+    // Normally the [`find_repeated_trait_mut`]` macro would be used instead of calling this directly.
+    #[doc(hidden)]
     pub fn find_repeated_mut<Trait>(&self, trait_id: TypeId) -> impl Iterator<Item = &mut Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
@@ -161,7 +169,8 @@ macro_rules! register_type {
     };
 }
 
-/// Use the [`add_object`] macro not this one.
+// Use the [`add_object`] macro not this one.
+#[doc(hidden)]
 #[macro_export]
 macro_rules! add_traits {
     ($component:expr, $obj_type:ty, $obj_ptr:expr, $trait1:ty) => {{
@@ -178,7 +187,8 @@ macro_rules! add_traits {
     }};
 }
 
-/// Use the [`add_object`] macro not this one.
+// Use the [`add_object`] macro not this one.
+#[doc(hidden)]
 #[macro_export]
 macro_rules! add_repeated_traits {
     ($component:expr, $obj_type:ty, $obj_ptr:expr, $trait1:ty) => {{

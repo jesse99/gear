@@ -3,7 +3,7 @@ use core::sync::atomic::AtomicU32;
 use std::fmt::{self, Formatter};
 use std::sync::atomic::Ordering;
 
-pub type TagStr = ArrayString<U16>;
+type TagStr = ArrayString<U16>;
 
 /// Used to identify components.
 #[derive(Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -29,13 +29,15 @@ impl ComponentId {
     }
 }
 
-pub static NEXT_COMPONENT_ID: AtomicU32 = AtomicU32::new(1);
+static NEXT_COMPONENT_ID: AtomicU32 = AtomicU32::new(1);
 
+#[doc(hidden)]
 #[cfg(debug_assertions)]
 pub fn next_component_id(tag: &str) -> ComponentId {
     ComponentId::new(tag, NEXT_COMPONENT_ID.fetch_add(1, Ordering::Relaxed))
 }
 
+#[doc(hidden)]
 #[cfg(not(debug_assertions))]
 pub fn next_component_id(_tag: &str) -> ComponentId {
     ComponentId::new(NEXT_COMPONENT_ID.fetch_add(1, Ordering::Relaxed))
