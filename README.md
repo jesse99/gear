@@ -1,7 +1,7 @@
 # gear
 
 Gear is a component object model for rust. So why does rust need a new object model? And
-what the heck is a component object model?
+why gear?
 
 ## Four pillars of OOP
 
@@ -24,8 +24,8 @@ inheritance is classic OOP where a class inherits from another class and tweaks 
 something. For example, you might have a FlashingButton that inherits from Button and
 overrides the draw method so that it blinks on and off.
 
-These are all useful and together work well in important domains like GUIs, sims, games,
-plugin architectures, etc.
+These are all useful and work well in important domains like GUIs, sims, games, plugin
+architectures, etc.
 
 ## Rust vs the pillars
 
@@ -40,8 +40,8 @@ Checkbox that can act Like a Button which can act like a View.
 implementation inheritance at all. There are good reasons for this: while implementation
 inheritance is useful it's also very
 [problematic](https://www.tedinski.com/2018/02/13/inheritance-modularity.html) because it
-introduces a tight coupling between the base and derived classes. Because of the issues
-that causes the consensus now is to prefer
+introduces a tight coupling between the base and derived classes. Because of these issues
+the consensus now is to prefer
 [composition over inheritance](https://en.wikipedia.org/wiki/Composition_over_inheritance).
 
 ## Gear basics
@@ -64,7 +64,7 @@ render.render(&mut canvas);
 
 1. **Abstraction** Client code deals only with traits so abstraction is great. A new trait
 can always be added to an object or a new object to a component so composition is no
-problem (and can even by dunamic).
+problem (and can even by dynamic).
 2. **Encapsulation** Also great because clients deal with traits not concrete types.
 3. **Polymorphism** Components can expose as many traits as they want and that's all
 hidden inside the Component so code can take a Component and query for the traits they
@@ -77,10 +77,12 @@ implementation inheritance but it's much simpler and way less brittle.
 ## Sample code
 
 The [repro](https://github.com/jesse99/gear/tree/main/examples/sim) has an example that
-consists of a wolf vs sheep simulation. Here is some annotated code from that to better illustrate how gear works:
+consists of a wolf vs sheep simulation. Here is some annotated code from that to illustrate
+how gear works:
 
 ```rust
-// Gear currently requires nightly and you'll need this in your main.rs (or lib.rs).
+// Gear currently requires nightly and you'll need this in your main.rs
+// (or lib.rs).
 #![feature(lazy_cell)]
 #![feature(ptr_metadata)]
 #![feature(unsize)]
@@ -92,11 +94,15 @@ pub trait Render {
 }
 register_type!(Render); // traits exposed by components have to be registered
 
-// Function to add a wolf to the world and to the Store (the Store manages component
-// lifetimes).
+// Function to add a wolf to the world and to the Store (the Store
+// manages component lifetimes).
 pub fn add_wolf(world: &mut World, store: &Store, loc: Point) -> ComponentId {
-    let mut component = Component::new("wolf"); // the name is used with Component's Debug trait
-    let id = component.id;  // each component is given a unique id allowing components to be compared and hashed
+    // The name "wolf" is used with Component's Debug trait.
+    let mut component = Component::new("wolf"); 
+
+    // Each component is given a unique id allowing components to be
+    // compared and hashed.
+    let id = component.id;  
     add_object!(
         component,
         Wolf,           // object type
@@ -104,21 +110,26 @@ pub fn add_wolf(world: &mut World, store: &Store, loc: Point) -> ComponentId {
         [Action, Animal, Predator, Render], // traits exposed by this object to the component
         [Debug]         // repeated traits (these can appear multiple times in a Component)
     );
-    add_object!(component, Mover, Mover::new(), [Moveable]);    // code reuse: sheeps also move
-    add_object!(        // more code reuse
+
+    // Wolf is the main object but there are a couple other objects
+    // which allow code reuse between Wolf and Sheep.
+    add_object!(component, Mover, Mover::new(), [Moveable]);    
+    add_object!(   
         component,
         Hungers,
         Hungers::new(INITAL_HUNGER, MAX_HUNGER),
         [Hunger],
         [Debug]         // Debug is repeated for this Component
     );
-    world.add_back(store, loc, component);  // animals are added to the back and grass to the front
+
+    // Animals are added to the back and grass to the front.
+    world.add_back(store, loc, component);  
     id
 }
 
 // Concrete object type, not directly used by client code.
 struct Wolf {
-    age: i32,       // wolves can die of old age
+    age: i32,      // wolves can die of old age
 }
 register_type!(Wolf);
 
@@ -139,7 +150,9 @@ pub fn render(&self, store: &Store) {
     for y in 0..self.height {
         for x in 0..self.width {
             let loc = Point::new(x, y);
-            if let Some(id) = self.actors.get(&loc).map(|v| v.last()).flatten() {   // render the last component at a loc
+
+            // Render the last component at a loc.
+            if let Some(id) = self.actors.get(&loc).map(|v| v.last()).flatten() {   
                 let component = store.get(*id);
                 let render = find_trait!(component, Render).unwrap();
                 let ch = render.render();
@@ -152,4 +165,4 @@ pub fn render(&self, store: &Store) {
     }
     println!();
 }
-}```
+```
