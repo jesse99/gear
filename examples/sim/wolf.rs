@@ -1,6 +1,7 @@
 //! Animal that eats grass and is eaten by wolves.
 use super::*;
 use colored::*;
+use core::fmt::Debug;
 use rand::seq::IteratorRandom;
 
 const VISION_RADIUS: i32 = 8; // wolves see quite a bit better than rabbits
@@ -21,7 +22,6 @@ struct Wolf {
 register_type!(Wolf);
 
 pub fn add_wolf(world: &mut World, store: &Store, loc: Point) -> ComponentId {
-    use core::fmt::Debug;
     let mut component = Component::new("wolf");
     let id = component.id;
     add_object!(
