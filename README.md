@@ -87,12 +87,14 @@ how gear works:
 #![feature(ptr_metadata)]
 #![feature(unsize)]
 
-// One of the traits the sim components expose. This is used by the World struct to render
-// all of the components in the sim.
+// One of the traits the sim components expose. This is used by the World 
+// struct to render all of the components in the sim.
 pub trait Render {
     fn render(&self) -> ColoredString;
 }
-register_type!(Render); // traits exposed by components have to be registered
+
+// Traits exposed by components have to be registered.
+register_type!(Render); 
 
 // Function to add a wolf to the world and to the Store (the Store
 // manages component lifetimes).
@@ -145,7 +147,8 @@ impl Render for Wolf {
 }
 
 // Somewhat simplified version of the World::render method.
-// Example of how components are used.
+// The World works with any components that implement the
+// Action and Render traits.
 pub fn render(&self, store: &Store) {
     for y in 0..self.height {
         for x in 0..self.width {
