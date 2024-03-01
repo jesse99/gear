@@ -61,11 +61,15 @@ impl Component {
         Object: 'static,
     {
         let erased: Box<dyn Any> = unsafe { Box::from_raw(obj_ptr) };
-
-        // Note that the same object type can be added multiple times. Not clear how useful
-        // this is but it may be when repeated traits are used.
-        self.objects.insert(obj_id, erased);
+        let old = self.objects.insert(obj_id, erased);
+        assert!(
+            old.is_none(),
+            "object type was already added to the component"
+        );
     }
+
+    // TODO: May want to support remove_object. Would be kinda slow: probably need to
+    // change traits and repeated so that the value includes the object's type id.
 
     /// Normally the [`has_trait`]` macro would be used instead of calling this directly.
     pub fn has<Trait>(&self, trait_id: TypeId) -> bool
@@ -620,17 +624,4 @@ mod tests {
                 || (displays[1] == "Apple" && displays[0] == "Banana")
         );
     }
-
-    // TODO: support removing objects?
-    // TODO: add an example project, maybe predator/prey sim? grass grows, rabbits eat grass, wolves eat rabbits
-    // TODO: fix clippy warnings
-    // TODO: review old gear project
-    // TODO: would be nice to retain stringified trait and object names
-    //       could then have a Debug impl that printed that
-    //       does make Components heavier weight, maybe only do this for debug builds?
-    //          or can we generate functions to get a string from an id? not sure how we'd call those
-    //          maybe ID could include a string in debug
-    //       can we use Formatter to optionally delegate to objects?
-    // TODO: review docs (especially the item linking)
-    // TODO: work on readme
 }
