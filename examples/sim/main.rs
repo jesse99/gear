@@ -91,6 +91,8 @@ fn print_legend() {
     println!("New skeletons are red.");
 }
 
+// Sim is loosely based on http://www.shodor.org/interactivate/activities/RabbitsAndWolves
+// (there's not quite enough there to fully specify how the sim should behave).
 fn run_sim(options: Args) {
     const WIDTH: i32 = 30;
     const HEIGHT: i32 = 20;
