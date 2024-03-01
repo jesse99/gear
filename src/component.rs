@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
 use super::*;
+use core::fmt::{self, Debug};
 use fnv::FnvHashMap;
 #[allow(unused_imports)]
 use paste::paste;
@@ -8,6 +9,7 @@ use std::hash::{Hash, Hasher};
 use std::marker::Unsize;
 use std::mem::transmute;
 use std::ptr::{self, DynMetadata, Pointee};
+use std::sync::atomic::Ordering;
 
 /// The unit of composition for the gear object model.
 /// A component consists  of one or more objects. Each object implements one or more
@@ -23,9 +25,10 @@ pub struct Component {
 }
 
 impl Component {
-    pub fn new() -> Component {
+    /// tag is used by Debug.
+    pub fn new(tag: &str) -> Component {
         Component {
-            id: next_component_id(),
+            id: next_component_id(tag),
             objects: FnvHashMap::default(),
             traits: FnvHashMap::default(),
             repeated: FnvHashMap::default(),
@@ -69,7 +72,9 @@ impl Component {
     }
 
     // TODO: May want to support remove_object. Would be kinda slow: probably need to
-    // change traits and repeated so that the value includes the object's type id.
+    // change traits and repeated so that the value includes the object's type id. One
+    // nice thing is, that if we did do that, Debug and Display could attach traits to
+    // the corresponding object.
 
     /// Normally the [`has_trait`]` macro would be used instead of calling this directly.
     pub fn has<Trait>(&self, trait_id: TypeId) -> bool
@@ -198,9 +203,10 @@ macro_rules! add_repeated_traits {
 /// ```
 /// #![feature(lazy_cell)]
 /// use gear::*;
+/// use core::fmt;
 /// use core::sync::atomic::Ordering;
 /// use paste::paste;
-/// use std::fmt::{self, Display};
+/// use std::fmt::{Display};
 ///
 /// struct Apple {}
 /// register_type!(Apple);
@@ -224,7 +230,7 @@ macro_rules! add_repeated_traits {
 /// register_type!(Display);
 ///
 /// let apple = Apple {};
-/// let mut component = Component::new();
+/// let mut component = Component::new("apple");
 /// add_object!(component, Apple, apple, [Fruit], [Display]);
 /// ```
 #[macro_export]
@@ -339,7 +345,7 @@ macro_rules! has_trait {
 /// }
 ///
 /// let apple = Apple {};
-/// let mut component = Component::new();
+/// let mut component = Component::new("apple");
 /// add_object!(component, Apple, apple, [Fruit]);
 ///
 /// let fruit = find_trait!(component, Fruit);
@@ -409,6 +415,17 @@ impl Hash for Component {
     }
 }
 
+impl Debug for Component {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{:?}", self.id)?;
+        for d in find_repeated_trait!(self, Debug) {
+            writeln!(f, "{d:?}")?;
+        }
+        fmt::Result::Ok(())
+    }
+}
+register_type!(Debug);
+
 // Decomposed trait pointer.
 struct TypeErasedPointer {
     pointer: *mut (),
@@ -451,9 +468,8 @@ impl TypeErasedPointer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fmt::{self, Display};
+    use std::fmt::Display;
     use std::sync::atomic::AtomicU8;
-    use std::sync::atomic::Ordering;
 
     trait Fruit {
         fn eat(&self) -> String;
@@ -539,7 +555,7 @@ mod tests {
     #[test]
     fn two_traits() {
         let apple = Apple {};
-        let mut component = Component::new();
+        let mut component = Component::new("apple");
         add_object!(component, Apple, apple, [Fruit, Ball]);
 
         let fruit = find_trait!(component, Fruit);
@@ -554,7 +570,7 @@ mod tests {
     #[test]
     fn has() {
         let apple = Apple {};
-        let mut component = Component::new();
+        let mut component = Component::new("apple");
         add_object!(component, Apple, apple, [Fruit, Ball]);
 
         assert!(has_trait!(component, Fruit));
@@ -564,7 +580,7 @@ mod tests {
     #[test]
     fn missing_trait() {
         let banana = Banana { ripeness: 0 };
-        let mut component = Component::new();
+        let mut component = Component::new("banana");
         add_object!(component, Banana, banana, [Fruit]);
 
         let fruit = find_trait!(component, Fruit);
@@ -580,7 +596,7 @@ mod tests {
         assert_eq!(DROP_COUNT.load(Ordering::Relaxed), 0);
         {
             let football = Football {};
-            let mut component = Component::new();
+            let mut component = Component::new("football");
             add_object!(component, Football, football, [Ball]);
 
             let ball = find_trait!(component, Ball);
@@ -593,7 +609,7 @@ mod tests {
     #[test]
     fn mutable_find() {
         let banana = Banana { ripeness: 0 };
-        let mut component = Component::new();
+        let mut component = Component::new("banana");
         add_object!(component, Banana, banana, [Fruit, Ripe]);
 
         let ripe = find_trait!(component, Ripe).unwrap();
@@ -611,7 +627,7 @@ mod tests {
     fn repeated() {
         let banana = Banana { ripeness: 0 };
         let apple = Apple {};
-        let mut component = Component::new();
+        let mut component = Component::new("banana");
         add_object!(component, Banana, banana, [Fruit, Ripe], [Display]);
         add_object!(component, Apple, apple, [Ball], [Display]);
 

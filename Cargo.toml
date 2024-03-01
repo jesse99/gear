@@ -6,8 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fnv = "1.0"   # custom hasher that is much more performant for small keys
-paste = "1.0" # allows identifiers to be pasted together within macros
+arraystring = "0.3" # copyable fixed width strings
+fnv = "1.0"         # custom hasher that is much more performant for small keys
+paste = "1.0"       # allows identifiers to be pasted together within macros
 
 [dev-dependencies]
 chrono = "0.4.31"                                  # time library

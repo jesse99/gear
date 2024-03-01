@@ -1,17 +1,25 @@
 //! Left behind for a bit after an animal dies.
 use super::*;
 use colored::*;
+use core::fmt::Debug;
 
 const MAX_LIFETIME: i32 = 4;
 
+#[derive(Debug)]
 struct Skeleton {
     lifetime: i32,
 }
 register_type!(Skeleton);
 
 pub fn add_skeleton(world: &mut World, store: &Store, loc: Point) {
-    let mut component = Component::new();
-    add_object!(component, Skeleton, Skeleton::new(), [Action, Render]);
+    let mut component = Component::new("skeleton");
+    add_object!(
+        component,
+        Skeleton,
+        Skeleton::new(),
+        [Action, Render],
+        [Debug]
+    );
     world.add_back(store, loc, component);
 }
 

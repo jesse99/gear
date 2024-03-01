@@ -1,29 +1,32 @@
 //! Fodder type that grows to cover the world but may also be eaten by rabbits.
 use super::*;
 use colored::*;
+use core::fmt::Debug;
 
 const GRASS_DELTA: u8 = 4; // amount by which grass grows each tick
 const INITIAL_HEIGHT: u8 = 48;
 const SPREAD_HEIGHT: u8 = 48;
 
+#[derive(Debug)]
 struct Grass {
     height: u8,
 }
 register_type!(Grass);
 
 pub fn add_grass(world: &mut World, store: &Store, loc: Point) {
-    let mut component = Component::new();
+    let mut component = Component::new("grass");
     add_object!(
         component,
         Grass,
         Grass::new(INITIAL_HEIGHT),
-        [Action, Render, Fodder]
+        [Action, Render, Fodder],
+        [Debug]
     );
     world.add_front(store, loc, component);
 }
 
 pub fn spread_grass(world: &mut World, store: &Store, loc: Point) {
-    let mut component = Component::new();
+    let mut component = Component::new("grass");
     add_object!(component, Grass, Grass::new(1), [Action, Render, Fodder]);
     world.add_front(store, loc, component);
 }

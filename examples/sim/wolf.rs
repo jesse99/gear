@@ -14,26 +14,30 @@ const BASAL_DELTA: i32 = 2;
 const REPRO_AGE: i32 = 10;
 const MAX_AGE: i32 = 50;
 
+#[derive(Debug)]
 struct Wolf {
     age: i32,
 }
 register_type!(Wolf);
 
 pub fn add_wolf(world: &mut World, store: &Store, loc: Point) -> ComponentId {
-    let mut component = Component::new();
+    use core::fmt::Debug;
+    let mut component = Component::new("wolf");
     let id = component.id;
     add_object!(
         component,
         Wolf,
         Wolf::new(),
-        [Action, Animal, Predator, Render]
+        [Action, Animal, Predator, Render],
+        [Debug]
     );
     add_object!(component, Mover, Mover::new(), [Moveable]);
     add_object!(
         component,
         Hungers,
         Hungers::new(INITAL_HUNGER, MAX_HUNGER),
-        [Hunger]
+        [Hunger],
+        [Debug]
     );
     world.add_back(store, loc, component);
     id

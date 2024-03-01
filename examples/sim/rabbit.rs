@@ -1,6 +1,7 @@
 //! Animal that eats grass and is eaten by wolves.
 use super::*;
 use colored::*;
+use core::fmt::Debug;
 use rand::seq::IteratorRandom;
 
 const VISION_RADIUS: i32 = 4; // rabbits don't have great vision
@@ -14,26 +15,29 @@ const BASAL_DELTA: i32 = 3;
 const REPRO_AGE: i32 = 10;
 const MAX_AGE: i32 = 25;
 
+#[derive(Debug)]
 struct Rabbit {
     age: i32,
 }
 register_type!(Rabbit);
 
 pub fn add_rabbit(world: &mut World, store: &Store, loc: Point) -> ComponentId {
-    let mut component = Component::new();
+    let mut component = Component::new("rabbit");
     let id = component.id;
     add_object!(
         component,
         Rabbit,
         Rabbit::new(),
-        [Action, Animal, Prey, Render]
+        [Action, Animal, Prey, Render],
+        [Debug]
     );
     add_object!(component, Mover, Mover::new(), [Moveable]);
     add_object!(
         component,
         Hungers,
         Hungers::new(INITAL_HUNGER, MAX_HUNGER),
-        [Hunger]
+        [Hunger],
+        [Debug]
     );
     world.add_back(store, loc, component);
     id

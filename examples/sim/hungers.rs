@@ -1,5 +1,7 @@
 use super::*;
+use core::fmt::Debug;
 
+#[derive(Debug)]
 pub struct Hungers {
     hunger: i32, // [0, max_hunger]
     max_hunger: i32,
