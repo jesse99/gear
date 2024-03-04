@@ -6,6 +6,7 @@ Note that there is now a requirement that Object's be Send + Sync.
 Additionally find_mut now takes a mutable Component reference so
 that two threads cannot get two mutable trait references.
 * ed4b2bd Added use declarations to example in readme
+* 28b09a9 Bumped minor version to account for breaking changes
 
 ---- version 0.1.0 ------------------------
 * initial release
