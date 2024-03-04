@@ -5,7 +5,7 @@
 use chrono::Utc;
 use clap::Parser;
 use core::sync::atomic::Ordering;
-use gear::*;
+use gear_objects::*;
 use paste::paste;
 use rand::rngs::StdRng;
 use rand::Rng;

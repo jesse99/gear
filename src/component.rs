@@ -36,7 +36,7 @@ impl Component {
         }
     }
 
-    // Normally the [`add_object`]` macro would be used instead of calling this directly.
+    // Normally the [`add_traits`]` macro would be used instead of calling this directly.
     #[doc(hidden)]
     pub fn add_trait<Trait, Object>(&mut self, trait_id: TypeId, obj_ptr: *mut Object)
     where
@@ -48,7 +48,7 @@ impl Component {
         assert!(old.is_none(), "trait was already added to the component");
     }
 
-    // Normally the [`add_object`]` macro would be used instead of calling this directly.
+    // Normally the [`add_repeated_traits`]` macro would be used instead of calling this directly.
     #[doc(hidden)]
     pub fn add_repeated_trait<Trait, Object>(&mut self, trait_id: TypeId, obj_ptr: *mut Object)
     where
@@ -149,7 +149,7 @@ impl Component {
 ///
 /// ```
 /// #![feature(lazy_cell)]
-/// use gear::*;
+/// use gear_objects::*;
 /// use core::sync::atomic::Ordering;
 /// use paste::paste;
 ///
@@ -212,7 +212,7 @@ macro_rules! add_repeated_traits {
 ///
 /// ```
 /// #![feature(lazy_cell)]
-/// use gear::*;
+/// use gear_objects::*;
 /// use core::fmt;
 /// use core::sync::atomic::Ordering;
 /// use paste::paste;
@@ -336,7 +336,7 @@ macro_rules! has_trait {
 ///
 /// ```
 /// #![feature(lazy_cell)]
-/// use gear::*;
+/// use gear_objects::*;
 /// use core::sync::atomic::Ordering;
 /// use paste::paste;
 ///
