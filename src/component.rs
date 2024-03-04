@@ -18,7 +18,7 @@ use std::sync::atomic::Ordering;
 /// compatibility.
 pub struct Component {
     pub id: ComponentId,
-    objects: FnvHashMap<TypeId, Box<dyn Any>>, // object id => type erased boxed object
+    objects: FnvHashMap<TypeId, Box<dyn Any + Send + Sync>>, // object id => type erased boxed object
     traits: FnvHashMap<TypeId, TypeErasedPointer>, // trait id => type erased trait pointer
     repeated: FnvHashMap<TypeId, Vec<TypeErasedPointer>>, // trait id => [type erased trait pointer]
     empty: Vec<TypeErasedPointer>,
@@ -64,9 +64,9 @@ impl Component {
     #[doc(hidden)]
     pub fn add_object<Object>(&mut self, obj_id: TypeId, obj_ptr: *mut Object)
     where
-        Object: 'static,
+        Object: Send + Sync + 'static,
     {
-        let erased: Box<dyn Any> = unsafe { Box::from_raw(obj_ptr) };
+        let erased: Box<dyn Any + Send + Sync> = unsafe { Box::from_raw(obj_ptr) };
         let old = self.objects.insert(obj_id, erased);
         assert!(
             old.is_none(),
@@ -104,7 +104,7 @@ impl Component {
 
     // Normally the [`find_trait_mut`]` macro would be used instead of calling this directly.
     #[doc(hidden)]
-    pub fn find_mut<Trait>(&self, trait_id: TypeId) -> Option<&mut Trait>
+    pub fn find_mut<Trait>(&mut self, trait_id: TypeId) -> Option<&mut Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
@@ -475,6 +475,12 @@ impl TypeErasedPointer {
     }
 }
 
+// Code can only get at these pointers except by going through the Component interface
+// which owns the underlying object so it's safe for TypeErasedPointer to be Send+Sync.
+// See https://doc.rust-lang.org/nomicon/send-and-sync.html for more.
+unsafe impl Send for TypeErasedPointer {}
+unsafe impl Sync for TypeErasedPointer {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -649,5 +655,85 @@ mod tests {
             (displays[0] == "Apple" && displays[1] == "Banana")
                 || (displays[1] == "Apple" && displays[0] == "Banana")
         );
+    }
+}
+
+#[cfg(test)]
+mod thread_tests {
+    use super::*;
+    use std::{
+        sync::{Arc, RwLock},
+        thread,
+    };
+
+    trait Name {
+        fn get(&self) -> &str;
+        fn get_mut(&mut self) -> &mut String;
+    }
+    register_type!(Name);
+
+    struct Thing {
+        name: String,
+    }
+    register_type!(Thing);
+
+    impl Name for Thing {
+        fn get(&self) -> &str {
+            &self.name
+        }
+
+        fn get_mut(&mut self) -> &mut String {
+            &mut self.name
+        }
+    }
+
+    #[test]
+    fn threading() {
+        let thing = Thing {
+            name: "hello world".to_owned(),
+        };
+        let mut component = Component::new("thing");
+        add_object!(component, Thing, thing, [Name]);
+
+        let gstate = Arc::new(RwLock::new(component));
+
+        let state = gstate.clone();
+        let thread1 = thread::spawn(move || {
+            for _ in 0..100 {
+                {
+                    let mut component = state.write().unwrap();
+                    let name = find_trait_mut!(component, Name).unwrap();
+                    let name = name.get_mut();
+                    if name.len() < 30 {
+                        name.insert(6, '_');
+                    }
+                }
+                thread::yield_now();
+            }
+        });
+
+        let state = gstate.clone();
+        let thread2 = thread::spawn(move || {
+            for _ in 0..100 {
+                {
+                    let mut component = state.write().unwrap();
+                    let name = find_trait_mut!(component, Name).unwrap();
+                    let name = name.get_mut();
+                    if name.len() > 11 {
+                        name.remove(6);
+                    }
+                }
+                thread::yield_now();
+            }
+        });
+
+        thread1.join().unwrap();
+        thread2.join().unwrap();
+
+        let component = &gstate.read().unwrap();
+        let name = find_trait!(component, Name).unwrap();
+        let name = name.get();
+        assert!(name.starts_with("hello"));
+        assert!(name.ends_with("world"));
     }
 }
