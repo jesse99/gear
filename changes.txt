@@ -1,6 +1,11 @@
 ---- upcoming version ------------------------  
 * a1c37c5 Updated for the crate name changing from gear to gear-objects
 * 21185a5 Added change history file
+* 67b72e7 Components are now Send + Sync.
+Note that there is now a requirement that Object's be Send + Sync.
+Additionally find_mut now takes a mutable Component reference so
+that two threads cannot get two mutable trait references.
+* ed4b2bd Added use declarations to example in readme
 
 ---- version 0.1.0 ------------------------
 * initial release
