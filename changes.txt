@@ -1,0 +1,5 @@
+upcoming version
+[main a1c37c5] Updated for the crate name changing from gear to gear-objects
+
+version 0.1.0
+initial release
