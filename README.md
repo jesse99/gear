@@ -87,6 +87,10 @@ how gear works:
 #![feature(ptr_metadata)]
 #![feature(unsize)]
 
+use core::sync::atomic::Ordering;
+use gear_objects::*;
+use paste::paste;
+
 // One of the traits the sim components expose. This is used by the World 
 // struct to render all of the components in the sim.
 pub trait Render {
