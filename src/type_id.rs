@@ -13,8 +13,9 @@ pub static NEXT_TYPE_ID: AtomicU16 = AtomicU16::new(0);
 #[macro_export]
 macro_rules! unique_type_id {
     () => {{
-        static LOCAL_ID: std::sync::LazyLock<u16> =
-            std::sync::LazyLock::new(|| NEXT_TYPE_ID.fetch_add(1, Ordering::Relaxed));
+        static LOCAL_ID: std::sync::LazyLock<u16> = std::sync::LazyLock::new(|| {
+            NEXT_TYPE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        });
         TypeId(*LOCAL_ID)
     }};
 }

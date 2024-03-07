@@ -9,7 +9,6 @@ use std::hash::{Hash, Hasher};
 use std::marker::Unsize;
 use std::mem::transmute;
 use std::ptr::{self, DynMetadata, Pointee};
-use std::sync::atomic::Ordering;
 
 /// The unit of composition for the gear object model.
 /// A component consists  of one or more objects. Each object implements one or more
@@ -150,7 +149,6 @@ impl Component {
 /// ```
 /// #![feature(lazy_cell)]
 /// use gear_objects::*;
-/// use core::sync::atomic::Ordering;
 /// use paste::paste;
 ///
 /// trait Fruit {
@@ -214,7 +212,6 @@ macro_rules! add_repeated_traits {
 /// #![feature(lazy_cell)]
 /// use gear_objects::*;
 /// use core::fmt;
-/// use core::sync::atomic::Ordering;
 /// use paste::paste;
 /// use std::fmt::{Display};
 ///
@@ -337,7 +334,6 @@ macro_rules! has_trait {
 /// ```
 /// #![feature(lazy_cell)]
 /// use gear_objects::*;
-/// use core::sync::atomic::Ordering;
 /// use paste::paste;
 ///
 /// struct Apple {}
@@ -486,6 +482,7 @@ mod tests {
     use super::*;
     use std::fmt::Display;
     use std::sync::atomic::AtomicU8;
+    use std::sync::atomic::Ordering;
 
     trait Fruit {
         fn eat(&self) -> String;
