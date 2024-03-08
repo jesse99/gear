@@ -1,5 +1,16 @@
----- upcoming version ------------------------  
+---- version 0.3 ------------------------  
 * 04b2de1 Client code no longer has to import atomic::Ordering
+* 5a3547a Improved referece rules.    
+Requiring a mutable Component reference in order to get a mutable trait
+reference is too limiting and not neccesary so now you can get multiple
+mutable trait refs as long as they are different traits while using an
+immutable Component ref.
+
+Though this isn't quite right: the check should be that the traits
+are on different objects not that they are different traits.
+* 23faa1c Outstanding references are now tracked per object not per trait
+* 6f3f87a Moved TypeErasedPointer into its own file
+* 71ebb84 Added a comment
 
 ---- version 0.2 ------------------------  
 * a1c37c5 Updated for the crate name changing from gear to gear-objects
