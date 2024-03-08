@@ -97,7 +97,7 @@ impl Wolf {
     fn log<'a, 'b>(&self, context: &Context<'a, 'b>, suffix: &str) {
         if context.world.verbose >= 1 {
             let component = context.store.get(context.id);
-            let hunger = find_trait_mut!(component, Hunger).unwrap();
+            let hunger = find_trait!(component, Hunger).unwrap();
             println!(
                 "wolf{} loc: {} age: {} hunger: {} {}",
                 context.id,
@@ -123,7 +123,7 @@ impl Action for Wolf {
 
         // If we're not hungry then reproduce.
         let component = context.store.get(context.id);
-        let hunger = find_trait_mut!(component, Hunger).unwrap();
+        let mut hunger = find_trait_mut!(component, Hunger).unwrap();
         if hunger.get() <= REPRO_HUNGER
             && self.age >= REPRO_AGE
             && context.world.rng().gen_bool(0.5)

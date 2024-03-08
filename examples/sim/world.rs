@@ -141,12 +141,12 @@ impl World {
                 };
 
                 let component = store.get(id);
-                let action = find_trait_mut!(component, Action).unwrap();
+                let mut action = find_trait_mut!(component, Action).unwrap();
                 if action.act(context) == LifeCycle::Dead {
                     let ids = self.actors.get_mut(&loc).unwrap();
                     let index = ids.iter().position(|e| *e == id).unwrap();
                     ids.remove(index);
-                    store.remove(component.id);
+                    store.remove(id);
                 }
             }
             store.sync();

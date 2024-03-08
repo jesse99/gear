@@ -1,4 +1,7 @@
 ---- upcoming version ------------------------  
+* 04b2de1 Client code no longer has to import atomic::Ordering
+
+---- version 0.2 ------------------------  
 * a1c37c5 Updated for the crate name changing from gear to gear-objects
 * 21185a5 Added change history file
 * 67b72e7 Components are now Send + Sync.

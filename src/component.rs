@@ -8,7 +8,9 @@ use std::any::Any;
 use std::hash::{Hash, Hasher};
 use std::marker::Unsize;
 use std::mem::transmute;
+use std::ops::{Deref, DerefMut};
 use std::ptr::{self, DynMetadata, Pointee};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 /// The unit of composition for the gear object model.
 /// A component consists  of one or more objects. Each object implements one or more
@@ -89,7 +91,7 @@ impl Component {
 
     // Normally the [`find_trait`]` macro would be used instead of calling this directly.
     #[doc(hidden)]
-    pub fn find<Trait>(&self, trait_id: TypeId) -> Option<&Trait>
+    pub fn find<Trait>(&self, trait_id: TypeId) -> Option<RefTrait<Trait>>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
@@ -103,7 +105,7 @@ impl Component {
 
     // Normally the [`find_trait_mut`]` macro would be used instead of calling this directly.
     #[doc(hidden)]
-    pub fn find_mut<Trait>(&mut self, trait_id: TypeId) -> Option<&mut Trait>
+    pub fn find_mut<Trait>(&self, trait_id: TypeId) -> Option<RefMutTrait<Trait>>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
@@ -117,7 +119,7 @@ impl Component {
 
     // Normally the [`find_repeated_trait`]` macro would be used instead of calling this directly.
     #[doc(hidden)]
-    pub fn find_repeated<Trait>(&self, trait_id: TypeId) -> impl Iterator<Item = &Trait>
+    pub fn find_repeated<Trait>(&self, trait_id: TypeId) -> impl Iterator<Item = RefTrait<Trait>>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
@@ -130,7 +132,10 @@ impl Component {
 
     // Normally the [`find_repeated_trait_mut`]` macro would be used instead of calling this directly.
     #[doc(hidden)]
-    pub fn find_repeated_mut<Trait>(&self, trait_id: TypeId) -> impl Iterator<Item = &mut Trait>
+    pub fn find_repeated_mut<Trait>(
+        &self,
+        trait_id: TypeId,
+    ) -> impl Iterator<Item = RefMutTrait<Trait>>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
@@ -366,6 +371,15 @@ macro_rules! find_trait {
     }};
 }
 
+/// The borrowing rules for components are the standard rust rules: mutable references are
+/// exclusive references. But they apply to individual objects within a component so it's
+/// possible to simultaneously get two mutable references to two different objects within
+/// a component but not two mutable references to the same object (this is checked at
+/// runtime).
+///
+/// WARNING: But this currently is not quite true. You can't get two mutable references
+/// to the same trait on an object but you can get two mutable references that are
+/// implemented on the same object right now.
 #[macro_export]
 macro_rules! find_trait_mut {
     ($component:expr, $trait:ty) => {{
@@ -425,19 +439,95 @@ impl Debug for Component {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{:?}", self.id)?;
         for d in find_repeated_trait!(self, Debug) {
-            writeln!(f, "{d:?}")?;
+            d.fmt(f)?;
         }
         fmt::Result::Ok(())
     }
 }
 register_type!(Debug);
 
+pub struct RefTrait<'a, Trait>
+where
+    Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
+{
+    trait_ptr: *mut Trait,
+    erased_ptr: &'a TypeErasedPointer,
+}
+
+impl<'a, Trait> Deref for RefTrait<'a, Trait>
+where
+    Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
+{
+    type Target = Trait;
+
+    fn deref(&self) -> &Trait {
+        unsafe { &*self.trait_ptr }
+    }
+}
+
+impl<'a, Trait> Drop for RefTrait<'a, Trait>
+where
+    Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
+{
+    fn drop(&mut self) {
+        let old = self
+            .erased_ptr
+            .immutable_refs
+            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        assert!(old < u32::MAX, "immutable_refs wrapped around");
+    }
+}
+
+pub struct RefMutTrait<'a, Trait>
+where
+    Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
+{
+    trait_ptr: *mut Trait,
+    erased_ptr: &'a TypeErasedPointer,
+}
+
+impl<'a, Trait> Deref for RefMutTrait<'a, Trait>
+where
+    Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
+{
+    type Target = Trait;
+
+    fn deref(&self) -> &Trait {
+        unsafe { &*self.trait_ptr }
+    }
+}
+
+impl<'a, Trait> DerefMut for RefMutTrait<'a, Trait>
+where
+    Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
+{
+    fn deref_mut(&mut self) -> &mut Trait {
+        unsafe { &mut *self.trait_ptr }
+    }
+}
+
+impl<'a, Trait> Drop for RefMutTrait<'a, Trait>
+where
+    Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
+{
+    fn drop(&mut self) {
+        let old = self
+            .erased_ptr
+            .mutable_refs
+            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        assert!(old < u32::MAX, "mutable_refs wrapped around");
+    }
+}
+
 // Decomposed trait pointer.
 struct TypeErasedPointer {
     pointer: *mut (),
     metadata: Box<*const ()>,
+    immutable_refs: AtomicU32,
+    mutable_refs: AtomicU32,
 }
 
+// TODO: move this stuff into its own file
 impl TypeErasedPointer {
     fn from_trait<Object, Trait>(pointer: *mut Object) -> Self
     where
@@ -446,28 +536,59 @@ impl TypeErasedPointer {
     {
         let (pointer, metadata) = (pointer as *mut Trait).to_raw_parts();
         let metadata = unsafe { transmute(Box::new(metadata)) };
+        let immutable_refs = AtomicU32::new(0);
+        let mutable_refs = AtomicU32::new(0);
 
-        TypeErasedPointer { pointer, metadata }
+        TypeErasedPointer {
+            pointer,
+            metadata,
+            immutable_refs,
+            mutable_refs,
+        }
     }
 
-    unsafe fn to_trait<'a, Trait>(&self) -> &'a Trait
+    unsafe fn to_trait<Trait>(&self) -> RefTrait<Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
+        let old = self
+            .immutable_refs
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        assert!(old < u32::MAX, "immutable_refs wrapped around");
+        assert!(
+            self.mutable_refs.load(Ordering::Relaxed) == 0,
+            "mutable reference already exists"
+        );
+
         let src = self.metadata.as_ref();
         let metadata = unsafe { *transmute::<_, *const <Trait as Pointee>::Metadata>(src) };
         let typed_ptr = ptr::from_raw_parts_mut::<Trait>(self.pointer, metadata);
-        &*typed_ptr
+        RefTrait {
+            trait_ptr: typed_ptr,
+            erased_ptr: self,
+        }
     }
 
-    unsafe fn to_trait_mut<'a, Trait>(&self) -> &'a mut Trait
+    unsafe fn to_trait_mut<Trait>(&self) -> RefMutTrait<Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
+        let old = self
+            .mutable_refs
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        assert!(old == 0, "mutable reference already exists");
+        assert!(
+            self.immutable_refs.load(Ordering::Relaxed) == 0,
+            "immutable_ref already exists"
+        );
+
         let src = self.metadata.as_ref();
         let metadata = unsafe { *transmute::<_, *const <Trait as Pointee>::Metadata>(src) };
         let typed_ptr = ptr::from_raw_parts_mut::<Trait>(self.pointer, metadata);
-        &mut *typed_ptr
+        RefMutTrait {
+            trait_ptr: typed_ptr,
+            erased_ptr: self,
+        }
     }
 }
 
@@ -482,7 +603,6 @@ mod tests {
     use super::*;
     use std::fmt::Display;
     use std::sync::atomic::AtomicU8;
-    use std::sync::atomic::Ordering;
 
     trait Fruit {
         fn eat(&self) -> String;
@@ -625,12 +745,20 @@ mod tests {
         let mut component = Component::new("banana");
         add_object!(component, Banana, banana, [Fruit, Ripe]);
 
-        let ripe = find_trait!(component, Ripe).unwrap();
-        assert_eq!(ripe.ripeness(), 0);
+        {
+            let ripe = find_trait!(component, Ripe).unwrap();
+            assert_eq!(ripe.ripeness(), 0);
+        }
 
-        let mripe = find_trait_mut!(component, Ripe).unwrap();
-        mripe.ripen();
-        mripe.ripen();
+        {
+            let mut ripe = find_trait_mut!(component, Ripe).unwrap();
+            ripe.ripen();
+            ripe.ripen();
+
+            // TODO this should panic but does not
+            // let mut fruit = find_trait_mut!(component, Fruit).unwrap();
+            // fruit.eat();
+        }
 
         let ripe = find_trait!(component, Ripe).unwrap(); // grab a new ref to appease the borrow checker
         assert_eq!(ripe.ripeness(), 2);
@@ -644,8 +772,11 @@ mod tests {
         add_object!(component, Banana, banana, [Fruit, Ripe], [Display]);
         add_object!(component, Apple, apple, [Ball], [Display]);
 
+        // display method
+        // fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error>;
+
         let displays: Vec<String> = find_repeated_trait!(component, Display)
-            .map(|t| format!("{t}"))
+            .map(|t| format!("{}", &(*t)))
             .collect();
         assert_eq!(displays.len(), 2);
         assert!(
@@ -698,8 +829,8 @@ mod thread_tests {
         let thread1 = thread::spawn(move || {
             for _ in 0..100 {
                 {
-                    let mut component = state.write().unwrap();
-                    let name = find_trait_mut!(component, Name).unwrap();
+                    let component = state.write().unwrap();
+                    let mut name = find_trait_mut!(component, Name).unwrap();
                     let name = name.get_mut();
                     if name.len() < 30 {
                         name.insert(6, '_');
@@ -713,8 +844,8 @@ mod thread_tests {
         let thread2 = thread::spawn(move || {
             for _ in 0..100 {
                 {
-                    let mut component = state.write().unwrap();
-                    let name = find_trait_mut!(component, Name).unwrap();
+                    let component = state.write().unwrap();
+                    let mut name = find_trait_mut!(component, Name).unwrap();
                     let name = name.get_mut();
                     if name.len() > 11 {
                         name.remove(6);

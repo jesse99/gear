@@ -176,7 +176,7 @@ impl Rabbit {
     fn log<'a, 'b>(&self, context: &Context<'a, 'b>, suffix: &str) {
         if context.world.verbose >= 1 {
             let component = context.store.get(context.id);
-            let hunger = find_trait_mut!(component, Hunger).unwrap();
+            let hunger = find_trait!(component, Hunger).unwrap();
             println!(
                 "rabbit{} loc: {} age: {} hunger: {} {}",
                 context.id,
@@ -202,7 +202,7 @@ impl Action for Rabbit {
 
         // If we're not hungry then reproduce.
         let component = context.store.get(context.id);
-        let hunger = find_trait_mut!(component, Hunger).unwrap();
+        let mut hunger = find_trait_mut!(component, Hunger).unwrap();
         if hunger.get() <= REPRO_HUNGER
             && self.age >= REPRO_AGE
             && !predator_nearby(&context)
@@ -239,7 +239,7 @@ impl Action for Rabbit {
                 ..context
             };
             let component = context.store.get(grass_id);
-            let fodder = find_trait_mut!(component, Fodder).unwrap();
+            let mut fodder = find_trait_mut!(component, Fodder).unwrap();
             fodder.eat(new_context, 25); // grass may die here
             return LifeCycle::Alive;
         } else {
