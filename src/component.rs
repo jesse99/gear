@@ -12,6 +12,20 @@ use std::ops::{Deref, DerefMut};
 use std::ptr::{self, DynMetadata, Pointee};
 use std::sync::atomic::{AtomicU32, Ordering};
 
+struct ObjectRefs {
+    immutable_refs: AtomicU32,
+    mutable_refs: AtomicU32,
+}
+
+impl ObjectRefs {
+    fn new() -> ObjectRefs {
+        ObjectRefs {
+            immutable_refs: AtomicU32::new(0),
+            mutable_refs: AtomicU32::new(0),
+        }
+    }
+}
+
 /// The unit of composition for the gear object model.
 /// A component consists  of one or more objects. Each object implements one or more
 /// traits. Component clients are only allowed to interact with objects via their traits.
@@ -22,6 +36,7 @@ pub struct Component {
     objects: FnvHashMap<TypeId, Box<dyn Any + Send + Sync>>, // object id => type erased boxed object
     traits: FnvHashMap<TypeId, TypeErasedPointer>, // trait id => type erased trait pointer
     repeated: FnvHashMap<TypeId, Vec<TypeErasedPointer>>, // trait id => [type erased trait pointer]
+    refs: FnvHashMap<TypeId, ObjectRefs>, // object id => outstanding trait references on the object
     empty: Vec<TypeErasedPointer>,
 }
 
@@ -34,29 +49,38 @@ impl Component {
             traits: FnvHashMap::default(),
             repeated: FnvHashMap::default(),
             empty: Vec::new(),
+            refs: FnvHashMap::default(),
         }
     }
 
     // Normally the [`add_traits`]` macro would be used instead of calling this directly.
     #[doc(hidden)]
-    pub fn add_trait<Trait, Object>(&mut self, trait_id: TypeId, obj_ptr: *mut Object)
-    where
+    pub fn add_trait<Trait, Object>(
+        &mut self,
+        object_id: TypeId,
+        trait_id: TypeId,
+        obj_ptr: *mut Object,
+    ) where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
         Object: Unsize<Trait> + 'static,
     {
-        let erased = TypeErasedPointer::from_trait::<Object, Trait>(obj_ptr);
+        let erased = TypeErasedPointer::from_trait::<Object, Trait>(object_id, obj_ptr);
         let old = self.traits.insert(trait_id, erased);
         assert!(old.is_none(), "trait was already added to the component");
     }
 
     // Normally the [`add_repeated_traits`]` macro would be used instead of calling this directly.
     #[doc(hidden)]
-    pub fn add_repeated_trait<Trait, Object>(&mut self, trait_id: TypeId, obj_ptr: *mut Object)
-    where
+    pub fn add_repeated_trait<Trait, Object>(
+        &mut self,
+        object_id: TypeId,
+        trait_id: TypeId,
+        obj_ptr: *mut Object,
+    ) where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
         Object: Unsize<Trait> + 'static,
     {
-        let erased = TypeErasedPointer::from_trait::<Object, Trait>(obj_ptr);
+        let erased = TypeErasedPointer::from_trait::<Object, Trait>(object_id, obj_ptr);
         let pointers = self.repeated.entry(trait_id).or_insert(vec![]);
         pointers.push(erased);
     }
@@ -73,6 +97,8 @@ impl Component {
             old.is_none(),
             "object type was already added to the component"
         );
+
+        self.refs.entry(obj_id).or_insert(ObjectRefs::new());
     }
 
     // TODO: May want to support remove_object. Would be kinda slow: probably need to
@@ -96,7 +122,8 @@ impl Component {
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
         if let Some(erased) = self.traits.get(&trait_id) {
-            let r = unsafe { erased.to_trait::<Trait>() };
+            let refs = self.refs.get(&erased.object_id).unwrap();
+            let r = unsafe { erased.to_trait::<Trait>(refs) };
             Some(r)
         } else {
             None
@@ -110,7 +137,8 @@ impl Component {
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
         if let Some(erased) = self.traits.get(&trait_id) {
-            let r = unsafe { erased.to_trait_mut::<Trait>() };
+            let refs = self.refs.get(&erased.object_id).unwrap();
+            let r = unsafe { erased.to_trait_mut::<Trait>(refs) };
             Some(r)
         } else {
             None
@@ -127,7 +155,10 @@ impl Component {
             .get(&trait_id)
             .unwrap_or(&self.empty)
             .iter()
-            .map(|e| unsafe { e.to_trait::<Trait>() })
+            .map(|e| unsafe {
+                let refs = self.refs.get(&e.object_id).unwrap();
+                e.to_trait::<Trait>(refs)
+            })
     }
 
     // Normally the [`find_repeated_trait_mut`]` macro would be used instead of calling this directly.
@@ -143,7 +174,10 @@ impl Component {
             .get(&trait_id)
             .unwrap_or(&self.empty)
             .iter()
-            .map(|e| unsafe { e.to_trait_mut::<Trait>() })
+            .map(|e| unsafe {
+                let refs = self.refs.get(&e.object_id).unwrap();
+                e.to_trait_mut::<Trait>(refs)
+            })
     }
 }
 
@@ -179,6 +213,7 @@ macro_rules! add_traits {
     ($component:expr, $obj_type:ty, $obj_ptr:expr, $trait1:ty) => {{
         paste! {
             $component.add_trait::<dyn $trait1, $obj_type>(
+                [<get_ $obj_type:lower _id>](),
                 [<get_ $trait1:lower _id>](),
                 $obj_ptr);
         }
@@ -197,6 +232,7 @@ macro_rules! add_repeated_traits {
     ($component:expr, $obj_type:ty, $obj_ptr:expr, $trait1:ty) => {{
         paste! {
             $component.add_repeated_trait::<dyn $trait1, $obj_type>(
+                [<get_ $obj_type:lower _id>](),
                 [<get_ $trait1:lower _id>](),
                 $obj_ptr);
         }
@@ -376,10 +412,6 @@ macro_rules! find_trait {
 /// possible to simultaneously get two mutable references to two different objects within
 /// a component but not two mutable references to the same object (this is checked at
 /// runtime).
-///
-/// WARNING: But this currently is not quite true. You can't get two mutable references
-/// to the same trait on an object but you can get two mutable references that are
-/// implemented on the same object right now.
 #[macro_export]
 macro_rules! find_trait_mut {
     ($component:expr, $trait:ty) => {{
@@ -451,7 +483,7 @@ where
     Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
 {
     trait_ptr: *mut Trait,
-    erased_ptr: &'a TypeErasedPointer,
+    refs: &'a ObjectRefs,
 }
 
 impl<'a, Trait> Deref for RefTrait<'a, Trait>
@@ -471,7 +503,7 @@ where
 {
     fn drop(&mut self) {
         let old = self
-            .erased_ptr
+            .refs
             .immutable_refs
             .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         assert!(old < u32::MAX, "immutable_refs wrapped around");
@@ -483,7 +515,7 @@ where
     Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
 {
     trait_ptr: *mut Trait,
-    erased_ptr: &'a TypeErasedPointer,
+    refs: &'a ObjectRefs,
 }
 
 impl<'a, Trait> Deref for RefMutTrait<'a, Trait>
@@ -512,7 +544,7 @@ where
 {
     fn drop(&mut self) {
         let old = self
-            .erased_ptr
+            .refs
             .mutable_refs
             .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         assert!(old < u32::MAX, "mutable_refs wrapped around");
@@ -521,42 +553,38 @@ where
 
 // Decomposed trait pointer.
 struct TypeErasedPointer {
+    object_id: TypeId,
     pointer: *mut (),
     metadata: Box<*const ()>,
-    immutable_refs: AtomicU32,
-    mutable_refs: AtomicU32,
 }
 
 // TODO: move this stuff into its own file
 impl TypeErasedPointer {
-    fn from_trait<Object, Trait>(pointer: *mut Object) -> Self
+    fn from_trait<Object, Trait>(object_id: TypeId, pointer: *mut Object) -> Self
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
         Object: Unsize<Trait>,
     {
         let (pointer, metadata) = (pointer as *mut Trait).to_raw_parts();
         let metadata = unsafe { transmute(Box::new(metadata)) };
-        let immutable_refs = AtomicU32::new(0);
-        let mutable_refs = AtomicU32::new(0);
 
         TypeErasedPointer {
+            object_id,
             pointer,
             metadata,
-            immutable_refs,
-            mutable_refs,
         }
     }
 
-    unsafe fn to_trait<Trait>(&self) -> RefTrait<Trait>
+    unsafe fn to_trait<'a, Trait>(&self, refs: &'a ObjectRefs) -> RefTrait<'a, Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
-        let old = self
+        let old = refs
             .immutable_refs
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         assert!(old < u32::MAX, "immutable_refs wrapped around");
         assert!(
-            self.mutable_refs.load(Ordering::Relaxed) == 0,
+            refs.mutable_refs.load(Ordering::Relaxed) == 0,
             "mutable reference already exists"
         );
 
@@ -565,20 +593,20 @@ impl TypeErasedPointer {
         let typed_ptr = ptr::from_raw_parts_mut::<Trait>(self.pointer, metadata);
         RefTrait {
             trait_ptr: typed_ptr,
-            erased_ptr: self,
+            refs,
         }
     }
 
-    unsafe fn to_trait_mut<Trait>(&self) -> RefMutTrait<Trait>
+    unsafe fn to_trait_mut<'a, Trait>(&self, refs: &'a ObjectRefs) -> RefMutTrait<'a, Trait>
     where
         Trait: ?Sized + Pointee<Metadata = DynMetadata<Trait>> + 'static,
     {
-        let old = self
+        let old = refs
             .mutable_refs
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         assert!(old == 0, "mutable reference already exists");
         assert!(
-            self.immutable_refs.load(Ordering::Relaxed) == 0,
+            refs.immutable_refs.load(Ordering::Relaxed) == 0,
             "immutable_ref already exists"
         );
 
@@ -587,7 +615,7 @@ impl TypeErasedPointer {
         let typed_ptr = ptr::from_raw_parts_mut::<Trait>(self.pointer, metadata);
         RefMutTrait {
             trait_ptr: typed_ptr,
-            erased_ptr: self,
+            refs,
         }
     }
 }
@@ -755,7 +783,7 @@ mod tests {
             ripe.ripen();
             ripe.ripen();
 
-            // TODO this should panic but does not
+            // this will panic
             // let mut fruit = find_trait_mut!(component, Fruit).unwrap();
             // fruit.eat();
         }
