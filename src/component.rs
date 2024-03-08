@@ -416,6 +416,8 @@ macro_rules! find_repeated_trait {
     }};
 }
 
+/// Returns an iterator over a trait that may be implemented by multiple objects within
+/// the component.
 #[macro_export]
 macro_rules! find_repeated_trait_mut {
     ($component:expr, $trait:ty) => {{
