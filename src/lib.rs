@@ -4,6 +4,7 @@
 
 mod component;
 mod component_id;
+mod type_erased_ptr;
 mod type_id;
 
 pub use component::*;
